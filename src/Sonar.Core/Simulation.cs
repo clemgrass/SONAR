@@ -180,8 +180,49 @@ public sealed class Simulation : ISimulation
         }
     }
 
-    private void ResolveTorpedoCollisions(
-        List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+    /// <summary>
+    /// Torpedo propio contra torpedo enemigo: se destruyen los dos. Es el §24 del GDD.
+    /// Un torpedo enemigo no daña a los contactos — ni fuego amigo entre enemigos ni
+    /// choque con pecios (TDD §4.5).
+    /// </summary>
+    private void ResolveTorpedoCollisions(List<Torpedo> torpedoes, List<GameEvent> events, int tick)
+    {
+        // Se marcan los ids a eliminar y se retiran al final. Manipular índices mientras
+        // se recorre en dos bucles anidados es donde más fácil se cuela un error.
+        //
+        // Lista y no HashSet a propósito: la regla de "ninguna colección de orden no
+        // garantizado dentro de Core" se verifica con grep y debe poder seguir siendo
+        // absoluta. Con un puñado de torpedos, Contains lineal no cuesta nada.
+        var destroyed = new List<int>();
+
+        foreach (var own in torpedoes.Where(t => t.Side == TorpedoSide.Own)
+                                     .OrderBy(t => t.Id.Value))
+        {
+            if (destroyed.Contains(own.Id.Value)) continue;
+
+            foreach (var enemy in torpedoes.Where(t => t.Side == TorpedoSide.Enemy)
+                                           .OrderBy(t => t.Id.Value))
+            {
+                if (destroyed.Contains(enemy.Id.Value)) continue;
+                if (Vec2.Distance(own.Position, enemy.Position) >= _config.HitRadius) continue;
+
+                events.Add(new EnemyTorpedoDestroyed(tick, enemy.Id.Value, enemy.Position,
+                    DestructionCause.TorpedoCollision));
+
+                // Sin este evento la intercepción no produce ninguna confirmación para el
+                // jugador: el torpedo propio desaparecería en silencio y sólo se anunciaría
+                // la muerte del enemigo. El spec §4.6 exige confirmación de impacto propia
+                // e independiente del barrido, así que la detonación se emite también aquí.
+                events.Add(new TorpedoDetonated(tick, own.Position, HitSomething: true));
+
+                destroyed.Add(own.Id.Value);
+                destroyed.Add(enemy.Id.Value);
+                break;
+            }
+        }
+
+        if (destroyed.Count > 0) torpedoes.RemoveAll(t => destroyed.Contains(t.Id.Value));
+    }
 
     /// <summary>
     /// Una defensa destruye cualquier torpedo — propio o ajeno — y cualquier contacto
@@ -276,8 +317,35 @@ public sealed class Simulation : ISimulation
         }
     }
 
+    /// <summary>
+    /// Dos impactos y se acaba la corrida (§20 del GDD). Sin desactivación de sistemas en
+    /// M1: los estados de daño del §21 van a un milestone posterior.
+    ///
+    /// El impacto sobre el propio submarino se confirma siempre, sin depender del barrido:
+    /// es corolario de la regla de confirmación del spec §4.6.
+    /// </summary>
     private PlayerSub ResolveSubHits(
-        PlayerSub sub, List<Torpedo> torpedoes, List<GameEvent> events, int tick) => sub;
+        PlayerSub sub, List<Torpedo> torpedoes, List<GameEvent> events, int tick)
+    {
+        for (var t = torpedoes.Count - 1; t >= 0; t--)
+        {
+            var torpedo = torpedoes[t];
+            if (torpedo.Side != TorpedoSide.Enemy) continue;
+            if (torpedo.Position.Length >= _config.SubHitRadius) continue;
+
+            torpedoes.RemoveAt(t);
+            sub = sub with { HitsTaken = sub.HitsTaken + 1 };
+            events.Add(new SubHit(tick, sub.HitsTaken));
+
+            if (sub.HitsTaken >= 2 && !sub.Destroyed)
+            {
+                sub = sub with { Destroyed = true };
+                events.Add(new SubDestroyed(tick));
+            }
+        }
+
+        return sub;
+    }
 
     /// <summary>
     /// La recarga ocurre en tiempo real y no pausa nada (§23 del GDD). No se puede
