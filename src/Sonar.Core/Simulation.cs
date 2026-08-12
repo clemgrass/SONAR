@@ -59,41 +59,87 @@ public sealed class Simulation : ISimulation
         // 1 · Aplicar comandos en el orden en que llegaron
         foreach (var command in commands) state = ApplyCommand(state, command, events);
 
-        // 2 · Rumbo y velocidad del submarino: los fija el guion de misión, no este bucle
+        // 2 · Rumbo y velocidad: los fija el guion de misión, no este bucle
 
         // 3 · Deriva del mundo
         var worldDrift = state.Sub.Course.ToUnitVector() * -state.Sub.Speed;
 
-        // 4 · Mover contactos — reciben la deriva
-        state = state.WithContacts(state.Contacts.Select(c =>
-            c.Alive ? c with { Position = c.Position + (c.Velocity + worldDrift) * dt } : c));
+        // Listas de trabajo. Se reconstruye el estado inmutable al final del tick.
+        var contacts = state.Contacts.ToList();
+        var torpedoes = state.Torpedoes.ToList();
+        var defenses = state.Defenses.ToList();
+        var sub = state.Sub;
 
-        // 5 · Disparo enemigo — Plan 3
+        // 4 · Mover contactos — reciben la deriva. Las defensas NO: esa omisión
+        //     deliberada es la anomalía del §25 del GDD. Ver TDD §4.4.
+        for (var i = 0; i < contacts.Count; i++)
+        {
+            var c = contacts[i];
+            if (!c.Alive) continue;
+            contacts[i] = c with { Position = c.Position + (c.Velocity + worldDrift) * dt };
+        }
+
+        // 5 · Disparo enemigo
+        state = FireEnemyTorpedoes(state, contacts, torpedoes, events);
 
         // 6 · Mover torpedos
-        state = state.WithTorpedoes(state.Torpedoes.Select(t =>
-            t with { Position = t.Position + t.Direction * t.Speed * dt }));
+        for (var i = 0; i < torpedoes.Count; i++)
+        {
+            var t = torpedoes[i];
+            torpedoes[i] = t with { Position = t.Position + t.Direction * t.Speed * dt };
+        }
 
-        // 7 · Colisiones — Plan 3
-        // 8 · Corridas agotadas y detonaciones por radio — Plan 3
-        // 9 · Impactos sobre el submarino — Plan 3
+        // 7 · Colisiones
+        ResolveDirectHits(contacts, torpedoes, events, state.Tick);
+        ResolveTorpedoCollisions(torpedoes, events, state.Tick);
+        ResolveDefenseCollisions(contacts, torpedoes, defenses, events, state.Tick);
 
-        // 10 · Barrido. El registro de lecturas con gating llega en el Plan 4.
-        state = state with { Sonar = AdvanceSweep(state, dt) };
+        // 8 · Corridas agotadas y detonaciones por radio
+        ResolveRunOuts(contacts, torpedoes, events, state.Tick);
 
-        // 11 · Recarga — Plan 3
+        // 9 · Impactos sobre el submarino
+        sub = ResolveSubHits(sub, torpedoes, events, state.Tick);
 
-        // 12 · Retirar entidades fuera de rango
-        state = state
-            .WithContacts(state.Contacts.Where(c => c.Alive))
-            .WithTorpedoes(state.Torpedoes.Where(t => t.Position.Length <= 1.0));
+        // 10 · Barrido
+        var sonar = AdvanceSweep(state, dt);
 
-        // 13 · Avanzar el contador
-        state = state with { Tick = state.Tick + 1 };
+        // 11 · Recarga
+        sub = AdvanceReload(sub, state.Tick, events);
 
-        State = state;
+        // 12 · Retirar entidades muertas y fuera de rango
+        contacts.RemoveAll(c => !c.Alive);
+        torpedoes.RemoveAll(t => t.Position.Length > 1.0);
+        defenses.RemoveAll(d => !d.Alive);
+
+        // 13 · Reconstruir el estado inmutable y avanzar el contador
+        state = state with { Sub = sub, Sonar = sonar, Tick = state.Tick + 1 };
+        State = state.WithContacts(contacts).WithTorpedoes(torpedoes).WithDefenses(defenses);
         return events;
     }
+
+    // --- Fases. Se llenan en las tareas siguientes de este plan. ---
+
+    private WorldState FireEnemyTorpedoes(
+        WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)
+        => state;
+
+    private void ResolveDirectHits(
+        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+
+    private void ResolveTorpedoCollisions(
+        List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+
+    private void ResolveDefenseCollisions(
+        List<Contact> contacts, List<Torpedo> torpedoes, List<Defense> defenses,
+        List<GameEvent> events, int tick) { }
+
+    private void ResolveRunOuts(
+        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+
+    private PlayerSub ResolveSubHits(
+        PlayerSub sub, List<Torpedo> torpedoes, List<GameEvent> events, int tick) => sub;
+
+    private PlayerSub AdvanceReload(PlayerSub sub, int tick, List<GameEvent> events) => sub;
 
     private WorldState ApplyCommand(WorldState state, Command command, List<GameEvent> events)
     {
