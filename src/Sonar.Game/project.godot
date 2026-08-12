@@ -1,0 +1,27 @@
+; Engine configuration file.
+; Generado a mano, no por el editor: así queda bajo control de versiones desde el
+; primer commit y no depende de que alguien repita los mismos clics.
+;
+; La escena principal (run/main_scene) la agrega la Tarea 9 del plan 4, junto con
+; Main.tscn. Hasta entonces el proyecto abre en el editor pero no corre.
+
+config_version=5
+
+[application]
+
+config/name="Sonar"
+config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+
+[dotnet]
+
+project/assembly_name="Sonar.Game"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=800
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

@@ -1,0 +1,18 @@
+<Project Sdk="Godot.NET.Sdk/4.7.0">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Sonar.Game conoce al Controller; el Controller no conoce a Godot. Esa dirección
+       única es lo que impide que tipos de Godot se filtren hacia la simulación.
+       Este proyecto NO se agrega a Sonar.sln: `dotnet test` correría sobre él sin los
+       ensamblados de Godot y fallaría. La suite corre sobre Sonar.sln; el juego se
+       compila desde Godot. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sonar.Controller\Sonar.Controller.csproj" />
+  </ItemGroup>
+
+</Project>
