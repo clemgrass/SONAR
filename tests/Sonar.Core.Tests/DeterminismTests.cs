@@ -56,5 +56,10 @@ public class DeterminismTests
             b.Run(1);
             Assert.Equal(StateHash.Compute(a.State), StateHash.Compute(b.State));
         }
+
+        // Este test avanza de tick en tick, así que es el único que detecta si el guion
+        // se reinicia en cada llamada a Run. Sin comandos aplicados compararía 600 ticks
+        // de pura deriva y no probaría nada del camino de comandos.
+        Assert.NotEmpty(a.Events);
     }
 }
