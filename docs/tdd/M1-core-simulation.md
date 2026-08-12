@@ -370,6 +370,16 @@ destruye nada se calcula la distancia al contacto vivo más cercano. Si cae en
 Este evento no tiene efecto en M1 y no se muestra en la UI. Se emite desde ahora para que el
 sistema de pistas lo consuma en un milestone posterior sin tocar el código de combate.
 
+`[ASSUMPTION]` **El alcance real de una banda excede su `RunToRadius`.** El impacto directo se
+resuelve en el paso 7 y el fin de corrida en el paso 8, así que un torpedo que ya pasó su
+`RunToRadius` todavía puede anotar impacto directo en ese mismo tick. El exceso está acotado por
+un tick de viaje (~0.012 con los valores de trabajo), de modo que el alcance efectivo es
+`RunToRadius + HitRadius + TorpedoSpeed · TickDurationSeconds` y no `RunToRadius + HitRadius`.
+
+No es un defecto: se sigue del orden de §3.2, y desordenarlo para "corregirlo" costaría más de lo
+que arregla. Está anotado porque importa al afinar los radios en M1 — verificado empíricamente en
+la Tarea 9 del plan 3, donde un torpedo de banda E (corrida 0.91) anotó impacto directo a 0.9167.
+
 ### 4.4 Defensas — y la anomalía
 
 Al aplicarse `DeployDefenseCommand(TargetCoordinate)`:

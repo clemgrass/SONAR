@@ -125,6 +125,12 @@ public class SurvivalTests
         for (var i = 0; i < 200; i++) events.AddRange(sim.Tick(NoCommands));
 
         Assert.Contains(sim.State.Contacts, c => c.Id.Value == 2);
+
+        // Sin esto el test sería vacuo: afirmar que el contacto 2 sigue vivo es
+        // trivialmente cierto si el torpedo nunca existió. El impacto en el submarino
+        // prueba que el torpedo recorrió la línea entera, y el contacto 2 está justo
+        // encima de esa línea.
+        Assert.Contains(events, e => e is SubHit);
     }
 
     [Fact]
