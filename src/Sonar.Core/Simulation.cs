@@ -251,7 +251,29 @@ public sealed class Simulation : ISimulation
     private PlayerSub ResolveSubHits(
         PlayerSub sub, List<Torpedo> torpedoes, List<GameEvent> events, int tick) => sub;
 
-    private PlayerSub AdvanceReload(PlayerSub sub, int tick, List<GameEvent> events) => sub;
+    /// <summary>
+    /// La recarga ocurre en tiempo real y no pausa nada (§23 del GDD). No se puede
+    /// interrumpir ni cancelar en M1: interrupción y fallo dependen del sistema de daño,
+    /// que va a un milestone posterior.
+    /// </summary>
+    private PlayerSub AdvanceReload(PlayerSub sub, int tick, List<GameEvent> events)
+    {
+        if (!sub.ReloadInProgress || tick < sub.ReloadCompletesAtTick) return sub;
+
+        var room = _config.MagazineSize - sub.AmmoLoaded;
+        var moved = Math.Min(room, sub.AmmoReserve);
+
+        var reloaded = sub with
+        {
+            AmmoLoaded = sub.AmmoLoaded + moved,
+            AmmoReserve = sub.AmmoReserve - moved,
+            ReloadInProgress = false,
+            ReloadCompletesAtTick = 0,
+        };
+
+        events.Add(new ReloadCompleted(tick, reloaded.AmmoLoaded));
+        return reloaded;
+    }
 
     private WorldState ApplyCommand(WorldState state, Command command, List<GameEvent> events)
     {
