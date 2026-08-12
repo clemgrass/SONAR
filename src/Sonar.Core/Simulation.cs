@@ -161,7 +161,46 @@ public sealed class Simulation : ISimulation
                 events.Add(new InputNotRecognized(state.Tick, unrecognized.RawText));
                 return state;
 
-            // FireCommand, DeployDefenseCommand y ReloadCommand llegan en el Plan 3.
+            case FireCommand fire:
+            {
+                if (state.Sub.ReloadInProgress)
+                {
+                    events.Add(new FireRejected(state.Tick, RejectionReason.Reloading));
+                    return state;
+                }
+                if (state.Sub.AmmoLoaded <= 0)
+                {
+                    events.Add(new FireRejected(state.Tick, RejectionReason.NoAmmo));
+                    return state;
+                }
+
+                var (id, advanced) = state.TakeEntityId();
+                var torpedo = Torpedo.CreateOwn(
+                    new TorpedoId(id), fire.Target, _layout, _config.TorpedoSpeed);
+
+                events.Add(new TorpedoFired(state.Tick, id,
+                    fire.Target.Bearing.Degrees, fire.Target.Band.Letter));
+
+                return advanced
+                    .WithTorpedoes(advanced.Torpedoes.Append(torpedo))
+                    with { Sub = advanced.Sub with { AmmoLoaded = advanced.Sub.AmmoLoaded - 1 } };
+            }
+
+            case ReloadCommand:
+            {
+                if (state.Sub.ReloadInProgress || state.Sub.AmmoReserve <= 0) return state;
+                events.Add(new ReloadStarted(state.Tick));
+                return state with
+                {
+                    Sub = state.Sub with
+                    {
+                        ReloadInProgress = true,
+                        ReloadCompletesAtTick = state.Tick + _config.ReloadTicks,
+                    },
+                };
+            }
+
+            // DeployDefenseCommand llega en el Plan 3, Tarea 6.
             default:
                 return state;
         }
