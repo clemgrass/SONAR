@@ -32,7 +32,10 @@ progress:
   plan_1_foundation: done          # 10/10 tareas, 78 tests
   plan_2_world_tick: done          # 10/10 tareas, 120 tests
   plan_3_combat_threat: done       # 10/10 tareas, 171 tests
-  plan_4_sonar_controller_godot: not_started
+  plan_4_sonar_controller_godot: in_progress
+    # 7/10. Tareas 8 y 9 (dibujo y escena) son trabajo de presentación, no de agente:
+    # el contrato está en docs/development/godot-wiring.md. La 10 queda a medias a
+    # propósito: SessionMetrics y la plantilla existen, falta engancharlas en Main.cs.
 
 systems:
   spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
@@ -42,9 +45,9 @@ systems:
   tick_loop: done
   combat: done
   enemy_threat: done               # IA mínima: dispara recto al origen a intervalos escalonados
-  sonar_gating: not_started
-  controller: not_started
-  godot_presentation: not_started
+  sonar_gating: done               # cruce de barrido + lecturas con gating
+  controller: done                 # parser, snapshot, acumulador con tope
+  godot_presentation: pending_design # proyecto y métricas listos; escena y dibujo pendientes
 
 open_decisions:
   - band_count                     # 5 u 8 -> M1 pregunta 5

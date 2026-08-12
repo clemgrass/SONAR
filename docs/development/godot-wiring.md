@@ -1,0 +1,401 @@
+# Cableado de Godot — contrato con el Controller
+
+Este documento es el contrato entre la escena de Godot y la simulación. Está escrito para
+poder construir toda la presentación **sin leer `Sonar.Core`**: si algo que necesitas para
+dibujar no aparece acá, o no existe todavía o está deliberadamente oculto.
+
+Cubre las tareas 8 y 9 del plan 4. El diseño visual es decisión de la capa de presentación;
+lo de acá abajo es lo que no se puede cambiar sin romper la simulación.
+
+---
+
+## 1 · La regla de capas
+
+```
+Sonar.Game (Godot)  ──referencia──▶  Sonar.Controller  ──referencia──▶  Sonar.Core
+```
+
+Las flechas van en un solo sentido y no hay ninguna de vuelta. **Ni `Sonar.Core` ni
+`Sonar.Controller` referencian Godot**, y esa ausencia es todo el mecanismo de defensa: si
+el Controller conociera Godot, tipos de Godot podrían filtrarse hacia la simulación y el
+Core dejaría de ser testeable sin abrir el editor.
+
+Consecuencia práctica: en `Sonar.Game` puedes usar `Vector2`, `Color`, `Node2D` y lo que
+quieras. En cuanto un tipo de Godot aparezca en una firma de `Sonar.Controller`, algo se
+hizo mal.
+
+Está verificado por grep, y el chequeo es parte de la Definition of Done:
+
+```bash
+grep -rn "Godot" src/Sonar.Core/ src/Sonar.Controller/
+```
+
+---
+
+## 2 · Todo lo que expone `GameController`
+
+Es la única clase que la escena necesita tocar.
+
+```csharp
+public sealed class GameController
+{
+    public GameController(SimulationConfig config, int seed, Bearing course, double speed);
+
+    public WorldSnapshot Snapshot { get; }
+    public IReadOnlyList<GameEvent> LastEvents { get; }
+
+    public void SetContacts(IEnumerable<Contact> contacts);
+    public void SubmitInput(string rawText);
+    public IReadOnlyList<GameEvent> Advance(double deltaSeconds);
+}
+```
+
+- **`Advance(delta)`** acumula tiempo real y corre los ticks completos que quepan. La
+  simulación nunca ve tiempo de pared. Devuelve los eventos de esos ticks.
+- **`SubmitInput(texto)`** parsea y **encola**. El comando se aplica en la próxima frontera
+  de tick, nunca a mitad. Texto vacío no encola nada. Texto que no es un comando encola un
+  `UnrecognizedInput`, que no es un error.
+- **`Snapshot`** se reconstruye en cada `Advance`. Es inmutable: guardarlo entre frames es
+  seguro, mutarlo es imposible.
+
+No hay `Pause()`, no hay `Reset()`, no hay acceso al `WorldState`. Si hace falta alguno,
+se agrega acá y se testea acá, no en la escena.
+
+---
+
+## 3 · Secuencia por frame
+
+```csharp
+public override void _Process(double delta)
+{
+    if (_controller is null) return;
+
+    foreach (var evt in _controller.Advance(delta))
+        Report(evt);              // 1 · eventos → registros visuales y sonido
+
+    _sonar.SetSnapshot(_controller.Snapshot);   // 2 · estado → dibujo
+    UpdateHud(_controller.Snapshot);            // 3 · estado → HUD
+}
+```
+
+Ese orden importa. Los eventos son **cosas que pasaron** durante el frame y se consumen una
+sola vez; el snapshot es **cómo está el mundo ahora** y se puede leer todas las veces que
+quieras. Confundirlos lleva a dibujar explosiones que quedan pegadas o a perder impactos.
+
+`Advance` puede devolver cero eventos (lo normal) o varios de golpe. Nunca devuelve null.
+
+### Ojo con el `delta` de Godot
+
+`_Process(delta)` entrega el tiempo real del frame. Pásalo tal cual. El acumulador ya tiene
+tope de recuperación (`MaxCatchUpTicks`, 5 por defecto): si la ventana se congela diez
+segundos, corre cinco ticks y descarta el resto, en vez de disparar una avalancha que el
+jugador percibe como un salto.
+
+---
+
+## 4 · Forma de los datos: `WorldSnapshot`
+
+```csharp
+public sealed record WorldSnapshot(
+    int Tick,
+    double SweepDegrees,          // ángulo actual del haz, [0, 360)
+    bool SweepRunning,
+    IReadOnlyList<ContactView> Contacts,
+    IReadOnlyList<TorpedoView> Torpedoes,
+    IReadOnlyList<EnemyTorpedoView> EnemyTorpedoes,
+    IReadOnlyList<DefenseView> Defenses,
+    int AmmoLoaded,
+    int AmmoReserve,
+    int DefensesAvailable,
+    bool ReloadInProgress,
+    int HitsTaken,                // 0, 1 o 2
+    bool Destroyed);
+```
+
+### `ContactView` — lo único con gating
+
+```csharp
+public sealed record ContactView(
+    int Id,
+    Vec2 Position,          // ⚠ posición de la LECTURA, no la real
+    int BearingDegrees,     // marcación de la lectura
+    char BandLetter,        // banda de la lectura, o '-' si cae fuera de toda banda
+    int AgeTicks);          // ticks transcurridos desde que el haz la registró
+```
+
+**`Position` es dónde el haz vio el contacto la última vez, no dónde está ahora.** Ese
+desfase es el juego entero: extrapolar de la lectura vieja a la posición actual es la
+habilidad que M1 está validando.
+
+No existe forma de llegar a la posición real desde el snapshot. No es una convención de
+buena conducta, es que el dato no viaja — hay un test (`SnapshotBuilderTests`) que falla si
+alguien agrega un campo que lo filtre.
+
+Corolarios para el dibujo:
+
+- Un contacto que el haz todavía no barrió **no aparece en la lista**. No es que esté en
+  posición cero: no está.
+- `AgeTicks` sirve para atenuar la etiqueta con la edad. A 60 ticks por segundo y un barrido
+  de 3,5 s, una vuelta son ~210 ticks: esa es la escala natural para la atenuación.
+- No dibujes una traza con las posiciones sucesivas. Mostrarla convertiría la extrapolación
+  en lectura pasiva y vaciaría la habilidad central (TDD §5.2). El cuaderno del jugador es
+  de papel.
+
+### El resto: posición real, cada frame
+
+```csharp
+public sealed record TorpedoView(int Id, Vec2 Position, int BearingDegrees, double RunToRadius);
+public sealed record EnemyTorpedoView(int Id, Vec2 Position);
+public sealed record DefenseView(int Id, Vec2 Position);
+```
+
+- **Torpedo propio**: posición real. Es tuyo, sabes dónde está. `RunToRadius` es el radio
+  donde detonará si no choca antes — vale la pena marcarlo, porque hace legible la decisión
+  de banda.
+- **Torpedo enemigo**: posición real. Se detecta por ruido, no por barrido.
+- **Defensa**: posición real.
+
+Que estas tres clases *no* tengan gating es una decisión de diseño (spec §4.1), no un
+descuido. Las cuatro reglas de información son: contactos con gating, todo lo demás sin él.
+
+---
+
+## 5 · Conversión de coordenadas
+
+El espacio de simulación es normalizado: el borde del scope está en radio **1.0** y el
+submarino siempre en el origen `(0,0)`.
+
+**Marcación 0 es el norte, o sea `(0, -1)`, y crece en sentido horario.** Coincide con el
+eje Y hacia abajo de Godot, así que la conversión es directa:
+
+```csharp
+private const float Radius = 320f;   // píxeles del borde del scope
+
+private static Vector2 ToScreen(Sonar.Core.Spatial.Vec2 v) =>
+    new((float)v.X * Radius, (float)v.Y * Radius);
+
+// Marcación (grados) a dirección unitaria en pantalla:
+private static Vector2 BearingToDirection(float degrees)
+{
+    var rad = Mathf.DegToRad(degrees);
+    return new Vector2(Mathf.Sin(rad), -Mathf.Cos(rad));
+}
+```
+
+Dos cosas que sorprenden y conviene tener presentes:
+
+1. **El haz arranca en marcación 000 y gira horario**, así que la marcación 000 es la
+   *última* en barrerse, no la primera. Un contacto justo al norte espera una vuelta entera
+   antes de aparecer. Ya indujo a error una vez, y hay un test que lo fija
+   (`BearingZero_IsTheLastBearingSwept_NotTheFirst`).
+2. **La zona muerta** (radio 0,10 con los valores de trabajo) es donde ningún torpedo propio
+   está armado. Vale la pena dibujarla, porque explica visualmente por qué un disparo a
+   quemarropa no hace nada.
+
+---
+
+## 6 · Catálogo de eventos
+
+Todos heredan de `GameEvent` y traen `int Tick`. Están en `Sonar.Core.Events`.
+
+| Evento | Campos | Qué significa para el jugador |
+|---|---|---|
+| `TorpedoFired` | `TorpedoId`, `BearingDegrees`, `BandLetter` | Salió un torpedo |
+| `TorpedoDetonated` | `Position`, `HitSomething` | Detonó: por fin de corrida o al interceptar |
+| `ContactDestroyed` | `ContactId`, `Position`, `Cause` | Confirmación de destrucción |
+| `NearMiss` | `ContactId`, `Distance` | **No mostrar en M1.** Es base de la pista 2 |
+| `FireRejected` | `Reason` | `NoAmmo` o `Reloading` |
+| `DefenseDeployed` | `DefenseId`, `Position` | Defensa puesta |
+| `DefenseRejected` | `Reason` | `NoneAvailable` |
+| `ReloadStarted` | — | Empezó la recarga |
+| `ReloadCompleted` | `AmmoLoaded` | Terminó |
+| `SonarToggled` | `Running` | Barrido activado o detenido |
+| `StatusReported` | `AmmoLoaded`, `AmmoReserve`, `Defenses` | Respuesta a `STATUS` |
+| `InputNotRecognized` | `RawText` | Texto que no es comando. **No es un error** |
+| `EnemyTorpedoFired` | `TorpedoId`, `SourceContactId` | Ruido de lanzamiento enemigo |
+| `EnemyTorpedoDestroyed` | `TorpedoId`, `Position`, `Cause` | Un torpedo enemigo murió |
+| `SubHit` | `HitsTaken` | Te pegaron. A los 2 se acaba |
+| `SubDestroyed` | — | Fin de corrida |
+
+`DestructionCause`: `DirectHit`, `Blast`, `Defense`, `TorpedoCollision`.
+`RejectionReason`: `NoAmmo`, `Reloading`, `NoneAvailable`.
+
+### La confirmación de impacto no depende del barrido
+
+`ContactDestroyed` y `SubHit` son ley del mundo: llegan siempre, aunque el haz esté en la
+otra punta del círculo o detenido (spec §4.6). El jugador tiene que poder saber si acertó.
+Es la única excepción al gating y es deliberada.
+
+### Los cuatro registros
+
+El spec §4.7 pide cuatro registros visuales distinguibles. En M1 existen los tres primeros;
+el cuarto se reserva y **no se usa todavía**:
+
+1. **Comando** — lo que el jugador escribió, tal cual, incluido lo que no se reconoció
+2. **Instrumento** — lo que reporta el sistema: disparos, impactos, recargas
+3. **Tripulación** — voz humana. Sin uso en M1
+4. **Sin firmar** — *reservado.* Que esté vacío en M1 es el punto: cuando aparezca algo acá,
+   tiene que significar algo. Si se usa antes de tiempo, deja de significar
+
+---
+
+## 7 · Arranque
+
+```csharp
+private const string ConfigPath = "res://../../config/simulation.working.json";
+
+var json = FileAccess.GetFileAsString(ConfigPath);
+var config = SimulationConfigLoader.LoadFromJson(json);
+
+_controller = new GameController(config, seed: 20260811,
+    course: new Bearing(0), speed: 0.05);
+
+_controller.SetContacts(BuildOpeningContacts(config));
+```
+
+`SimulationConfig.Validate()` corre sola en el constructor y **lanza** si algún valor rompe
+una invariante (por ejemplo, un radio de impacto menor al avance por tick de un torpedo, que
+produciría tunneling). Es a propósito: un error de configuración debe reventar al arrancar,
+no producir comportamiento raro media hora después.
+
+La semilla fija hace la sesión reproducible. Cambiarla cambia el escenario.
+
+### Contactos de apertura
+
+```csharp
+private static IEnumerable<Contact> BuildOpeningContacts(SimulationConfig config)
+{
+    var spawner = new ContactSpawner(config);
+    var enemies = spawner.SpawnEnemies(
+        spawnTick: 0, firstId: 100,
+        positions: new[]
+        {
+            new Vec2(0.10, -0.78), new Vec2(0.74, 0.18),
+            new Vec2(-0.62, 0.44), new Vec2(-0.30, -0.70),
+        },
+        velocities: new[]
+        {
+            new Vec2(0.03, 0.06), new Vec2(-0.07, 0.02),
+            new Vec2(0.05, -0.04), new Vec2(0.04, 0.05),
+        });
+
+    foreach (var enemy in enemies) yield return enemy;
+
+    // Referencia inerte: deriva con el mundo mientras las defensas no.
+    // Es lo que hace legible la anomalía del §25 — ver spec §4.9.
+    yield return Contact.CreateInert(new ContactId(200), new Vec2(0.55, 0.55));
+}
+```
+
+`ContactSpawner` escalona los tiempos de disparo. Sin escalonar, los cuatro enemigos
+dispararían en el mismo tick y la presión llegaría en oleadas sincronizadas en vez de
+sostenida.
+
+El contacto inerte no es decorado: sin una referencia que sí derive, la anomalía de las
+defensas no se puede leer.
+
+---
+
+## 8 · Comandos que el parser acepta
+
+| Texto | Efecto |
+|---|---|
+| `C047`, `c47`, `FIRE C047`, `F C047` | Dispara a marcación 047, banda C |
+| `DEF C047`, `DEFEND C047` | Despliega defensa ahí |
+| `RELOAD` | Recarga. **No pausa el mundo**: el haz sigue girando |
+| `SONAR` | Alterna el barrido |
+| `STATUS` | Reporta munición y defensas |
+
+Mayúsculas, minúsculas y espacios de sobra dan igual. Lo que **no** se acepta:
+
+- `C400` y `C360` — marcación fuera de rango. **No se toma módulo**: tomarlo haría que un
+  error de tipeo disparara silenciosamente a C040, y con munición limitada eso se paga caro
+- `F047` — con cinco bandas, F no existe
+- Cualquier otra cosa → `UnrecognizedInput`, que se registra y no hace nada
+
+El número de bandas sale de la configuración, no está fijo en el parser.
+
+---
+
+## 9 · Verificación manual
+
+### El sonar funciona
+
+| Verificación | Esperado |
+|---|---|
+| El haz gira | Una línea recorre el círculo continuamente |
+| Aparecen contactos | Marca con etiqueta `047 C` al pasar el haz |
+| Las etiquetas envejecen | Se atenúan hasta que el haz vuelve a pasar |
+| `C047` + Enter | Sale un torpedo por esa marcación |
+| El torpedo detona | Marca en el punto de corrida, mensaje en el registro |
+| `hola` | Aparece en el registro y no pasa nada más |
+| `C400` | Igual: se registra y no hace nada |
+| `RELOAD` | El HUD muestra recargando y el haz **sigue girando** |
+| `SONAR` | El haz se congela; las etiquetas dejan de refrescarse |
+| `DEF C090` | Marca de defensa en esa coordenada |
+| Torpedos enemigos | Marcas que se acercan al centro |
+| Dos impactos | El HUD muestra `2/2` y destruido, y todo se detiene |
+
+### El gating es real — la que valida el diseño entero
+
+1. Detén el barrido con `SONAR`
+2. Observa una etiqueta de contacto
+3. Espera diez segundos
+
+**Esperado:** la etiqueta no se mueve, aunque el contacto sí se está moviendo por debajo. Al
+reactivar el barrido con `SONAR`, la etiqueta salta a la posición nueva.
+
+Si la etiqueta sigue al contacto en tiempo real, el gating se rompió. Lo más probable es que
+alguien esté leyendo `Contact.Position` en vez de `ContactView.Position` — pero eso ya no
+debería ser posible desde la escena, porque `Contact` no viaja en el snapshot.
+
+### La anomalía se puede leer
+
+Con el submarino avanzando (`speed: 0.05`), deja una defensa junto al contacto inerte y
+mira un rato: el pecio se aleja hacia atrás y la defensa se queda contigo. **Es la mecánica,
+no un bug** — no le agregues deriva a las defensas para "arreglarlo".
+
+---
+
+## 10 · Métricas
+
+`SessionMetrics` (en `src/Sonar.Game/SessionMetrics.cs`) mide la pregunta 2 de M1 y la tasa
+de acierto que sirve de proxy para la 1. Conexión:
+
+```csharp
+private readonly SessionMetrics _metrics = new();
+
+// en _Ready, después de darle foco al campo de texto:
+_input.TextChanged += _ => _metrics.NoteKeystroke();
+
+// primera línea de OnCommandSubmitted:
+_metrics.NoteSubmit();
+
+// en el manejo de eventos:
+case TorpedoFired e:      _metrics.NoteShot(); /* ... */ break;
+case ContactDestroyed e:  _metrics.NoteKill(); /* ... */ break;
+
+// y el volcado — conviene en los dos, porque cerrar la ventana y detener desde
+// el editor (F8) no disparan la misma notificación:
+public override void _Notification(int what)
+{
+    if (what == NotificationWMCloseRequest) _metrics.WriteReport();
+}
+
+public override void _ExitTree() => _metrics.WriteReport();
+```
+
+`WriteReport` es idempotente, así que llamarla dos veces no duplica nada. Escribe
+`user://m1-session.csv`.
+
+---
+
+## 11 · Lo que M1 no está midiendo
+
+La escena de M1 es deliberadamente fea. M1 valida **si extrapolar lecturas de sonar es
+satisfactorio**, no si se ve bien. Pulir la presentación antes de tener las ocho respuestas
+anotadas en [m1-findings.md](m1-findings.md) es la señal más clara de haberse salido del
+milestone.
+
+Si la respuesta a la pregunta 1 resulta negativa, M1 está igualmente completo: cumplió su
+función, que era avisar a tiempo y barato.
