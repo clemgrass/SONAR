@@ -30,6 +30,14 @@ public sealed record FireRejected(int Tick, RejectionReason Reason) : GameEvent(
 public sealed record DefenseDeployed(int Tick, int DefenseId, Vec2 Position) : GameEvent(Tick);
 public sealed record DefenseRejected(int Tick, RejectionReason Reason) : GameEvent(Tick);
 
+/// <summary>
+/// La defensa se gastó. Hay que anunciarlo: la defensa se consume al usarse y sólo se puede
+/// tener un número muy chico desplegado, así que si el jugador no se entera de que quedó
+/// descubierto, la decisión de cuándo volver a poner una deja de existir.
+/// </summary>
+public sealed record DefenseDetonated(int Tick, int DefenseId, Vec2 Position, int TargetsDestroyed)
+    : GameEvent(Tick);
+
 // --- Munición ---
 public sealed record ReloadStarted(int Tick) : GameEvent(Tick);
 public sealed record ReloadCompleted(int Tick, int AmmoLoaded) : GameEvent(Tick);

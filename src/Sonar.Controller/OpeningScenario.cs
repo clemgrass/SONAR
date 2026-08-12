@@ -20,7 +20,7 @@ public static class OpeningScenario
     /// La deriva se suma a la velocidad de todos los contactos, así que este número fija
     /// cuánto dura un encuentro.
     /// </summary>
-    public const double SubSpeed = 0.03;
+    public const double SubSpeed = 0.02;
 
     public static readonly Bearing Course = new(0);
 
@@ -61,10 +61,10 @@ public static class OpeningScenario
             },
             velocities: new[]
             {
-                new Vec2(0.002, -0.027),
-                new Vec2(-0.004, -0.030),
-                new Vec2(0.003, -0.032),
-                new Vec2(0.001, -0.028),
+                new Vec2(0.0015, -0.018),
+                new Vec2(-0.0030, -0.020),
+                new Vec2(0.0020, -0.022),
+                new Vec2(0.0008, -0.019),
             });
 
         foreach (var enemy in enemies)

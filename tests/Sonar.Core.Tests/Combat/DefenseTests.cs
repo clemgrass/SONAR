@@ -73,8 +73,65 @@ public class DefenseTests
 
         var destroyed = (ContactDestroyed)Assert.Single(events, e => e is ContactDestroyed);
         Assert.Equal(DestructionCause.Defense, destroyed.Cause);
-        // La defensa sobrevive al choque.
+
+        // La defensa se consume al detonar y hay que anunciarlo: el jugador tiene que
+        // saber que quedó descubierto.
+        var spent = (DefenseDetonated)Assert.Single(events, e => e is DefenseDetonated);
+        Assert.Equal(1, spent.TargetsDestroyed);
+        Assert.Empty(sim.State.Defenses);
+    }
+
+    [Fact]
+    public void SpentDefense_FreesItsSlot()
+    {
+        // El límite es de concurrencia, no de inventario: con capacidad uno no puedes tener
+        // dos a la vez, pero sí volver a poner una apenas la anterior se gaste.
+        var config = TestWorld.Config() with { DefenseCapacity = 1 };
+        var sim = TestWorld.Still(config);
+        sim.SetContacts(new[]
+        {
+            new Contact
+            {
+                Id = new ContactId(1), Kind = ContactKind.Enemy,
+                Position = new Vec2(0.90, 0.0), Velocity = new Vec2(-0.5, 0.0),
+                Alive = true, NextFireTick = int.MaxValue,
+            },
+        });
+
+        sim.Tick(Deploy(90, 2));
+        Assert.Equal(0, sim.State.Sub.DefensesAvailable);
+
+        // Con una ya desplegada, la segunda se rechaza.
+        Assert.Single(sim.Tick(Deploy(270, 2)), e => e is DefenseRejected);
         Assert.Single(sim.State.Defenses);
+
+        // El contacto llega, la defensa detona y el hueco vuelve a quedar libre.
+        var events = new List<GameEvent>();
+        for (var i = 0; i < 120; i++) events.AddRange(sim.Tick(NoCommands));
+
+        Assert.Contains(events, e => e is DefenseDetonated);
+        Assert.Empty(sim.State.Defenses);
+        Assert.Equal(1, sim.State.Sub.DefensesAvailable);
+
+        // Y ahora sí acepta otra.
+        Assert.Contains(sim.Tick(Deploy(270, 2)), e => e is DefenseDeployed);
+        Assert.Single(sim.State.Defenses);
+    }
+
+    [Fact]
+    public void UntouchedDefense_IsNotSpent()
+    {
+        // Se gasta al detonar, no con el tiempo. Sin esto el test de arriba pasaría
+        // aunque las defensas se evaporaran solas.
+        var config = TestWorld.Config() with { DefenseCapacity = 1 };
+        var sim = TestWorld.Still(config);
+
+        var events = new List<GameEvent>(sim.Tick(Deploy(90, 2)));
+        for (var i = 0; i < 600; i++) events.AddRange(sim.Tick(NoCommands));
+
+        Assert.DoesNotContain(events, e => e is DefenseDetonated);
+        Assert.Single(sim.State.Defenses);
+        Assert.Equal(0, sim.State.Sub.DefensesAvailable);
     }
 
     [Fact]

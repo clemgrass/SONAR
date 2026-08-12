@@ -384,11 +384,25 @@ la Tarea 9 del plan 3, donde un torpedo de banda E (corrida 0.91) anotó impacto
 
 Al aplicarse `DeployDefenseCommand(TargetCoordinate)`:
 
-- Si `DefensesAvailable == 0` → `DefenseRejected(NoneAvailable)`
+- Si ya hay `config.DefenseCapacity` defensas **vivas** → `DefenseRejected(NoneAvailable)`
 - Si no, se crea `Defense` con `Position` = punto central de la coordenada pedida
 
 Cada tick, una defensa destruye cualquier torpedo (propio o ajeno) y cualquier contacto **enemigo**
-cuya distancia sea menor a `config.DefenseRadius`, evaluando en orden de id. La defensa sobrevive.
+cuya distancia sea menor a `config.DefenseRadius`, evaluando en orden de id.
+
+`[DECIDED]` **La defensa se consume al detonar.** Detona una vez, se lleva todo lo que tenga
+dentro del radio en ese instante, emite `DefenseDetonated` y desaparece.
+
+`[DECIDED]` **`DefenseCapacity` es un límite de concurrencia, no de inventario.** Cuenta cuántas
+puede haber desplegadas a la vez, no cuántas quedan en toda la corrida. Al gastarse una, el hueco
+vuelve a quedar libre y se puede poner otra, sin límite de veces.
+
+Por eso `PlayerSub.DefensesAvailable` **se deriva** de las defensas vivas al final de cada tick en
+vez de llevarse como contador que se decrementa: un contador habría que acordarse de devolverlo.
+
+Razón: con la capacidad en uno —el valor de trabajo— desplegar es quedarse sin red hasta que la
+defensa se gaste, y elegir dónde ponerla es apostar por dónde viene la amenaza. Como inventario
+agotable la mecánica se usa una vez por corrida y no se llega a aprender.
 
 `[DECIDED]` Los contactos **inertes** son inmunes a las defensas y las atraviesan sin efecto.
 

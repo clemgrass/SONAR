@@ -111,7 +111,11 @@ public sealed class Simulation : ISimulation
         torpedoes.RemoveAll(t => t.Position.Length > 1.0);
         defenses.RemoveAll(d => !d.Alive);
 
-        // 13 · Reconstruir el estado inmutable y avanzar el contador
+        // 13 · Reconstruir el estado inmutable y avanzar el contador.
+        //      DefensesAvailable se deriva de las defensas vivas, no se lleva como contador
+        //      aparte: así una defensa que se gastó devuelve el hueco sin que nadie tenga
+        //      que acordarse de sumarlo.
+        sub = sub with { DefensesAvailable = _config.DefenseCapacity - defenses.Count };
         state = state with { Sub = sub, Sonar = sonar, Tick = state.Tick + 1 };
         State = state.WithContacts(contacts).WithTorpedoes(torpedoes).WithDefenses(defenses);
         return events;
@@ -226,7 +230,12 @@ public sealed class Simulation : ISimulation
 
     /// <summary>
     /// Una defensa destruye cualquier torpedo — propio o ajeno — y cualquier contacto
-    /// enemigo que la toque. La defensa sobrevive. Es el §24 del GDD.
+    /// enemigo que la toque, y <b>se consume al hacerlo</b>. Detona una vez, llevándose todo
+    /// lo que tenga dentro del radio en ese instante, y desaparece.
+    ///
+    /// Que se gaste es lo que le da peso a la decisión: con `config.DefenseCapacity` puesto
+    /// en uno, desplegarla es quedarse sin red hasta que explote, y elegir dónde ponerla es
+    /// una apuesta sobre por dónde viene la amenaza.
     ///
     /// Los contactos inertes la atraviesan sin sufrir nada, y eso no es una excepción
     /// menor: la anomalía del §25 sólo es observable si el jugador puede dejar una defensa
@@ -238,9 +247,12 @@ public sealed class Simulation : ISimulation
         List<Contact> contacts, List<Torpedo> torpedoes, List<Defense> defenses,
         List<GameEvent> events, int tick)
     {
-        foreach (var defense in defenses)
+        for (var d = 0; d < defenses.Count; d++)
         {
+            var defense = defenses[d];
             if (!defense.Alive) continue;
+
+            var destroyed = 0;
 
             for (var c = 0; c < contacts.Count; c++)
             {
@@ -251,6 +263,7 @@ public sealed class Simulation : ISimulation
                 contacts[c] = contact with { Alive = false };
                 events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
                     DestructionCause.Defense));
+                destroyed++;
             }
 
             for (var t = torpedoes.Count - 1; t >= 0; t--)
@@ -263,7 +276,13 @@ public sealed class Simulation : ISimulation
                         DestructionCause.Defense));
 
                 torpedoes.RemoveAt(t);
+                destroyed++;
             }
+
+            if (destroyed == 0) continue;
+
+            defenses[d] = defense with { Alive = false };
+            events.Add(new DefenseDetonated(tick, defense.Id.Value, defense.Position, destroyed));
         }
     }
 
@@ -432,7 +451,12 @@ public sealed class Simulation : ISimulation
 
             case DeployDefenseCommand deploy:
             {
-                if (state.Sub.DefensesAvailable <= 0)
+                // El límite es de concurrencia, no de inventario: puedes volver a poner una
+                // apenas la anterior explote, pero nunca tener más de DefenseCapacity a la
+                // vez. Con la capacidad en uno, desplegar es quedarse sin red hasta que se
+                // gaste, y elegir dónde ponerla es apostar por dónde viene la amenaza.
+                var deployed = state.Defenses.Count(d => d.Alive);
+                if (deployed >= _config.DefenseCapacity)
                 {
                     events.Add(new DefenseRejected(state.Tick, RejectionReason.NoneAvailable));
                     return state;
@@ -444,7 +468,10 @@ public sealed class Simulation : ISimulation
 
                 return advanced
                     .WithDefenses(advanced.Defenses.Append(Defense.Create(new DefenseId(id), position)))
-                    with { Sub = advanced.Sub with { DefensesAvailable = advanced.Sub.DefensesAvailable - 1 } };
+                    with { Sub = advanced.Sub with
+                    {
+                        DefensesAvailable = _config.DefenseCapacity - deployed - 1,
+                    } };
             }
 
             default:

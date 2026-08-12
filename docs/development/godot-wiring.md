@@ -206,7 +206,8 @@ Todos heredan de `GameEvent` y traen `int Tick`. Están en `Sonar.Core.Events`.
 | `NearMiss` | `ContactId`, `Distance` | **No mostrar en M1.** Es base de la pista 2 |
 | `FireRejected` | `Reason` | `NoAmmo` o `Reloading` |
 | `DefenseDeployed` | `DefenseId`, `Position` | Defensa puesta |
-| `DefenseRejected` | `Reason` | `NoneAvailable` |
+| `DefenseRejected` | `Reason` | `NoneAvailable` — ya hay una desplegada |
+| `DefenseDetonated` | `DefenseId`, `Position`, `TargetsDestroyed` | La defensa se gastó. **Hay que mostrarlo** |
 | `ReloadStarted` | — | Empezó la recarga |
 | `ReloadCompleted` | `AmmoLoaded` | Terminó |
 | `SonarToggled` | `Running` | Barrido activado o detenido |
@@ -219,6 +220,14 @@ Todos heredan de `GameEvent` y traen `int Tick`. Están en `Sonar.Core.Events`.
 
 `DestructionCause`: `DirectHit`, `Blast`, `Defense`, `TorpedoCollision`.
 `RejectionReason`: `NoAmmo`, `Reloading`, `NoneAvailable`.
+
+### La defensa se gasta
+
+`DefenseCapacity` limita cuántas defensas puede haber **desplegadas a la vez**, no cuántas quedan
+en la corrida. Con el valor de trabajo en uno: pones una, y hasta que detone no puedes poner otra.
+
+Por eso `DefenseDetonated` no es un evento decorativo. Es el momento en que el jugador vuelve a
+quedar descubierto, y si no se muestra, la decisión de cuándo poner la siguiente desaparece.
 
 ### La confirmación de impacto no depende del barrido
 

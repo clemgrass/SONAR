@@ -94,7 +94,7 @@ public class OpeningScenarioTests
         var fired = (TorpedoFired)Assert.Single(events, e => e is TorpedoFired);
         Assert.Equal(47, fired.BearingDegrees);
         Assert.Equal('C', fired.BandLetter);
-        Assert.Equal(3, controller.Snapshot.AmmoLoaded);
+        Assert.Equal(config.MagazineSize - 1, controller.Snapshot.AmmoLoaded);
         Assert.Single(controller.Snapshot.Torpedoes);
     }
 
@@ -195,13 +195,18 @@ public class OpeningScenarioTests
         var controller = Opening(out var config);
         Run(controller, config, config.SweepPeriodSeconds + 0.5);
 
+        const double Window = 14.0;
         var first = controller.Snapshot.Contacts.Single(c => c.Id == 200).Position;
-        Run(controller, config, 14.0);
+        Run(controller, config, Window);
         var later = controller.Snapshot.Contacts.Single(c => c.Id == 200).Position;
 
-        // Deriva pura hacia el sur: el pecio no tiene velocidad propia.
-        Assert.True(later.Y - first.Y > 0.25,
-            $"El pecio apenas se movió: {first.Y:F3} -> {later.Y:F3}.");
+        // Deriva pura hacia el sur: el pecio no tiene velocidad propia. El piso se deriva
+        // en vez de fijarse a mano — la lectura puede tener hasta una vuelta de haz de
+        // atraso, y así el test sigue valiendo si se ajusta la velocidad o el barrido.
+        var floor = OpeningScenario.SubSpeed * (Window - config.SweepPeriodSeconds);
+
+        Assert.True(later.Y - first.Y > floor,
+            $"El pecio apenas se movió: {first.Y:F3} -> {later.Y:F3} (mínimo {floor:F3}).");
     }
 
     [Fact]
@@ -211,7 +216,12 @@ public class OpeningScenarioTests
         // Junto con ThePlayerGetsTimeToReadBeforeTheFirstShotLands deja la ventana
         // tranquila acotada por ambos lados.
         var controller = Opening(out var config);
-        var events = Run(controller, config, 26.0);
+
+        // Derivado y no a ojo: el primer disparo cae en la gracia más el intervalo normal,
+        // así que el margen sigue valiendo si se ajusta cualquiera de los dos.
+        var firstFire = (OpeningScenario.FirstFireGraceTicks + config.EnemyFireIntervalTicks)
+                        * config.TickDurationSeconds;
+        var events = Run(controller, config, firstFire + 5.0);
 
         var fired = events.OfType<EnemyTorpedoFired>().ToArray();
         Assert.NotEmpty(fired);

@@ -44,11 +44,11 @@ public partial class Main : Node
         _controller.SetContacts(OpeningScenario.Contacts(config));
 
         _input.TextSubmitted += OnCommandSubmitted;
-        _input.TextChanged += _ => _metrics.NoteKeystroke();
+        _input.TextChanged += OnTextChanged;
         _input.GrabFocus();
 
-        Append("[color=#5d8f74]SONAR M1 — validation prototype[/color]");
-        Append("[color=#5d8f74]type C047 and press Enter · RELOAD · SONAR · STATUS · DEF C047[/color]");
+        Append(Dim, "SONAR M1 — VALIDATION PROTOTYPE");
+        Append(Dim, "TYPE C047 AND PRESS ENTER · RELOAD · SONAR · STATUS · DEF C047");
     }
 
     /// <summary>
@@ -89,12 +89,37 @@ public partial class Main : Node
             (snap.Destroyed ? "    DESTROYED" : string.Empty);
     }
 
+    /// <summary>
+    /// El terminal es de 1945: todo va en mayúscula. Se fuerza acá y no con una fuente en
+    /// versalitas porque el texto tiene que llegar en mayúscula también al historial.
+    /// Godot no emite text_changed al asignar Text por código, así que no hay recursión;
+    /// la guarda de igualdad está igual, porque depender de eso es frágil.
+    /// </summary>
+    private void OnTextChanged(string text)
+    {
+        _metrics.NoteKeystroke();
+
+        var upper = text.ToUpperInvariant();
+        if (upper == text) return;
+
+        var caret = _input.CaretColumn;
+        _input.Text = upper;
+        _input.CaretColumn = caret;
+    }
+
     private void OnCommandSubmitted(string text)
     {
         _metrics.NoteSubmit();
-        Append($"[color=#fde047]> {text}[/color]");
-        _controller.SubmitInput(text);
+
+        var command = text.ToUpperInvariant();
+        Append(Typed, $"> {command}");
+        _controller.SubmitInput(command);
+
         _input.Clear();
+
+        // Volver a modo escritura sin tocar nada. Escribir un comando y tener que hacer
+        // clic para escribir el siguiente rompe el ritmo entero del terminal.
+        _input.GrabFocus();
     }
 
     /// <summary>
@@ -120,6 +145,9 @@ public partial class Main : Node
             case FireRejected e: Instrument($"FIRE REJECTED · {e.Reason}"); break;
             case DefenseDeployed e: Instrument($"DEFENSE {e.DefenseId} DEPLOYED"); break;
             case DefenseRejected e: Instrument($"DEFENSE REJECTED · {e.Reason}"); break;
+            case DefenseDetonated e:
+                Instrument($"DEFENSE {e.DefenseId} SPENT · {e.TargetsDestroyed} DESTROYED");
+                break;
             case ReloadStarted: Instrument("RELOADING"); break;
             case ReloadCompleted e: Instrument($"RELOAD COMPLETE · {e.AmmoLoaded}"); break;
             case SonarToggled e: Instrument(e.Running ? "SWEEP RUNNING" : "SWEEP STOPPED"); break;
@@ -136,11 +164,19 @@ public partial class Main : Node
         }
     }
 
-    private void Instrument(string text) => Append($"[color=#5d8f74]  {text}[/color]");
+    private const string Dim = "#5d8f74";     // registro de instrumento
+    private const string Typed = "#fde047";   // registro de comando
 
-    private void Append(string bbcode)
+    private void Instrument(string text) => Append(Dim, $"  {text}");
+
+    /// <summary>
+    /// El color va como etiqueta aparte del contenido a propósito: el historial se muestra
+    /// todo en mayúscula, y pasar la línea entera por ToUpperInvariant convertiría
+    /// [color=...] en [COLOR=...], que el parser de BBCode de Godot no reconoce.
+    /// </summary>
+    private void Append(string color, string content)
     {
-        _log.AppendText(bbcode + "\n");
+        _log.AppendText($"[color={color}]{content.ToUpperInvariant()}[/color]\n");
         _log.ScrollToLine(_log.GetLineCount() - 1);
     }
 
