@@ -123,8 +123,34 @@ public sealed class Simulation : ISimulation
         WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)
         => state;
 
+    /// <summary>
+    /// Torpedos en orden de id ascendente; para cada uno, contactos en orden de id
+    /// ascendente, y detona con el primero que cumpla. Elimina toda ambigüedad de
+    /// simultaneidad sin desempates aleatorios (TDD §3.3).
+    /// </summary>
     private void ResolveDirectHits(
-        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick)
+    {
+        for (var t = torpedoes.Count - 1; t >= 0; t--)
+        {
+            var torpedo = torpedoes[t];
+            if (torpedo.Side != TorpedoSide.Own) continue;
+            if (torpedo.Position.Length < torpedo.ArmedFromRadius) continue;
+
+            for (var c = 0; c < contacts.Count; c++)
+            {
+                var contact = contacts[c];
+                if (!contact.Alive) continue;
+                if (Vec2.Distance(torpedo.Position, contact.Position) >= _config.HitRadius) continue;
+
+                contacts[c] = contact with { Alive = false };
+                events.Add(new ContactDestroyed(tick, contact.Id.Value,
+                    torpedo.Position, DestructionCause.DirectHit));
+                torpedoes.RemoveAt(t);
+                break;
+            }
+        }
+    }
 
     private void ResolveTorpedoCollisions(
         List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
