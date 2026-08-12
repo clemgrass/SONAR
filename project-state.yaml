@@ -1,0 +1,63 @@
+# Estado del proyecto — legible por máquina
+#
+# Responde "¿en qué estado está esto?" sin leer todo el corpus de documentación.
+# Se mantiene CORTO a propósito: actualizarlo es el primer paso de la Definition of
+# Done de cada ticket, y un archivo largo se desactualiza (spec §6.4).
+
+project:
+  name: sonar
+  status: pre_production
+
+milestone:
+  current: M1
+  goal: validar si extrapolar lecturas de sonar es satisfactorio
+  exit_criteria: docs/development/m1-findings.md con las ocho preguntas respondidas
+
+toolchain:
+  dotnet_sdk: 10.0.110
+  target_framework: net9.0
+  godot: 4.7.stable.mono
+  godot_binary: godot-mono          # el binario `godot` es la build sin C#
+  test_framework: xunit
+
+  notes:
+    - "dotnet new sln requiere --format sln: el SDK 10 genera .slnx por defecto y el fallo es silencioso"
+    - "dotnet new classlib/xunit generan net10.0 por defecto; hay que corregir a net9.0 a mano"
+
+architecture:
+  chain: Sonar.Game (Godot) -> Sonar.Controller -> Sonar.Core
+  rule: ni Core ni Controller referencian Godot; esa ausencia es el enforcement
+
+progress:
+  plan_1_foundation: done          # 10/10 tareas, 78 tests
+  plan_2_world_tick: not_started
+  plan_3_combat_threat: not_started
+  plan_4_sonar_controller_godot: not_started
+
+systems:
+  spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
+  config_and_validation: done
+  random_source: done
+  entities: not_started
+  tick_loop: not_started
+  combat: not_started
+  enemy_threat: not_started
+  sonar_gating: not_started
+  controller: not_started
+  godot_presentation: not_started
+
+open_decisions:
+  - band_count                     # 5 u 8 -> M1 pregunta 5
+  - bearing_zero_padding
+  - hit_and_blast_radii            # M1 pregunta 5
+  - near_miss_window_width
+  - sweep_period                   # M1 pregunta 4
+  - repeat_and_fine_adjust_commands # M1 pregunta 6
+  - salvo_command                  # M1 pregunta 7
+  - cross_platform_bit_determinism # solo si se quieren replays compartibles
+
+documents:
+  gdd: GAME DESIGN DOCUMENT.md
+  spec: docs/superpowers/specs/2026-08-11-sonar-preproduction-design.md
+  tdd: docs/tdd/M1-core-simulation.md
+  plans: docs/superpowers/plans/
