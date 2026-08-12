@@ -364,7 +364,36 @@ no un bug** — no le agregues deriva a las defensas para "arreglarlo".
 
 ---
 
-## 10 · Métricas
+## 10 · La trampa del terminal
+
+**El `LineEdit` deja de aceptar teclas después de Enter aunque conserve el foco.** Godot 4.4
+separó el *modo edición* del foco: al enviar, el `LineEdit` sale del modo edición y el
+jugador tiene que hacer clic para escribir el comando siguiente. Es un terminal, así que eso
+lo rompe entero.
+
+Lo confuso es el diagnóstico: `HasFocus()` devuelve `true`, `Editable` es `true`, y
+`GuiGetFocusOwner()` apunta al `LineEdit`. Todo se ve bien y las teclas se pierden igual.
+
+```csharp
+// en _Ready
+_input.KeepEditingOnTextSubmit = true;
+
+// en _Process — las dos condiciones son distintas y hacen falta las dos:
+// el foco se pierde al hacer clic fuera, el modo edición se pierde al enviar.
+if (!_input.HasFocus()) _input.GrabFocus();
+if (!_input.IsEditing()) _input.Edit();
+```
+
+Hay una verificación automática. Teclea dos comandos seguidos sin clic entremedio y devuelve
+código de salida distinto de cero si el segundo se pierde:
+
+```bash
+godot-mono --path src/Sonar.Game -- --m1-selftest
+```
+
+Si reconstruyes la escena, córrela.
+
+## 11 · Métricas
 
 `SessionMetrics` (en `src/Sonar.Game/SessionMetrics.cs`) mide la pregunta 2 de M1 y la tasa
 de acierto que sirve de proxy para la 1. Conexión:
@@ -397,7 +426,7 @@ public override void _ExitTree() => _metrics.WriteReport();
 
 ---
 
-## 11 · Lo que M1 no está midiendo
+## 12 · Lo que M1 no está midiendo
 
 La escena de M1 es deliberadamente fea. M1 valida **si extrapolar lecturas de sonar es
 satisfactorio**, no si se ve bien. Pulir la presentación antes de tener las ocho respuestas

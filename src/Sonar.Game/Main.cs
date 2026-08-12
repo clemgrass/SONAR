@@ -45,7 +45,17 @@ public partial class Main : Node
 
         _input.TextSubmitted += OnCommandSubmitted;
         _input.TextChanged += OnTextChanged;
+
+        // Godot 4.4 separó el modo edición del foco. Al enviar con Enter, el LineEdit
+        // conserva el foco pero SALE del modo edición y deja de aceptar teclas hasta que
+        // lo reactives — de ahí el clic obligatorio para escribir el segundo comando.
+        // HasFocus() seguía devolviendo true, que es justo lo que lo hacía difícil de ver.
+        _input.KeepEditingOnTextSubmit = true;
+
         _input.GrabFocus();
+        _input.Edit();
+
+        _selfTest = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--m1-selftest") >= 0;
 
         Append(Dim, "SONAR M1 — VALIDATION PROTOTYPE");
         Append(Dim, "TYPE C047 AND PRESS ENTER · RELOAD · SONAR · STATUS · DEF C047");
@@ -71,11 +81,81 @@ public partial class Main : Node
         return SimulationConfigLoader.LoadFromJson(File.ReadAllText(path));
     }
 
+    // --- Verificación del terminal: `godot-mono --path src/Sonar.Game -- --m1-selftest` ---
+    //
+    // Teclea dos comandos seguidos sin ningún clic entremedio y comprueba que ambos llegan.
+    // Existe porque este camino ya se rompió una vez de una forma que engañaba: al enviar
+    // con Enter el LineEdit conservaba el foco pero salía del modo edición, así que
+    // HasFocus() decía true mientras las teclas se perdían. No hay forma de teclear desde
+    // fuera del juego en este entorno, y ninguna prueba de xUnit alcanza a la escena.
+
+    private bool _selfTest;
+    private int _frame;
+    private bool _sawStatus;
+
+    private static void TypeText(string text)
+    {
+        foreach (var c in text) TypeKey((Key)char.ToUpperInvariant(c), c);
+    }
+
+    private static void TypeKey(Key keycode, char unicode = '\0')
+    {
+        var down = new InputEventKey { Keycode = keycode, Pressed = true };
+        if (unicode != '\0') down.Unicode = unicode;
+        Input.ParseInputEvent(down);
+
+        var up = (InputEventKey)down.Duplicate();
+        up.Pressed = false;
+        Input.ParseInputEvent(up);
+    }
+
+    private void RunSelfTest()
+    {
+        _frame++;
+        switch (_frame)
+        {
+            case 60: TypeText("c047"); break;
+            case 62: TypeKey(Key.Enter); break;
+
+            // Segundo comando sin tocar nada. Acá es donde fallaba.
+            case 90: TypeText("status"); break;
+            case 92: TypeKey(Key.Enter); break;
+
+            case 150: ReportSelfTest(); break;
+        }
+    }
+
+    private void ReportSelfTest()
+    {
+        var expected = _controller.Snapshot.AmmoLoaded == 2;   // el disparo consumió uno
+        var ok = _metrics.Commands == 2 && _metrics.ShotsFired == 1 && _sawStatus && expected;
+
+        GD.Print($"[SELFTEST] {(ok ? "PASA" : "FALLA")} · commands={_metrics.Commands}/2 " +
+                 $"shots={_metrics.ShotsFired}/1 status={_sawStatus} " +
+                 $"ammo={_controller.Snapshot.AmmoLoaded}/2");
+
+        if (!ok) GD.PushError("El terminal perdió el segundo comando: se puede escribir uno solo sin clic.");
+
+        GetTree().Quit(ok ? 0 : 1);
+    }
+
     public override void _Process(double delta)
     {
+        if (_selfTest) RunSelfTest();
+
         // Los eventos son cosas que pasaron y se consumen una vez; el snapshot es cómo
         // está el mundo ahora y se puede leer siempre. Ese orden importa.
         foreach (var evt in _controller.Advance(delta)) Report(evt);
+
+        // El terminal siempre tiene que estar listo para escribir, sin tener que tocarlo.
+        // Las dos condiciones son distintas y hacen falta las dos: el foco se pierde al
+        // hacer clic en otra parte, y el modo edición se pierde al enviar con Enter.
+        //
+        // Cuesta poder seleccionar texto del registro con el mouse. Es un intercambio
+        // aceptado: no hay nada más con qué interactuar en esta escena, y un terminal que
+        // deja de aceptar teclas es peor que un registro que no se puede copiar.
+        if (!_input.HasFocus()) _input.GrabFocus();
+        if (!_input.IsEditing()) _input.Edit();
 
         var snap = _controller.Snapshot;
         _lastTick = snap.Tick;
@@ -152,6 +232,7 @@ public partial class Main : Node
             case ReloadCompleted e: Instrument($"RELOAD COMPLETE · {e.AmmoLoaded}"); break;
             case SonarToggled e: Instrument(e.Running ? "SWEEP RUNNING" : "SWEEP STOPPED"); break;
             case StatusReported e:
+                _sawStatus = true;
                 Instrument($"AMMO {e.AmmoLoaded}/{e.AmmoReserve} · DEFENSES {e.Defenses}");
                 break;
             case EnemyTorpedoFired: Instrument("LAUNCH TRANSIENT"); break;
