@@ -1,0 +1,107 @@
+using System;
+using Sonar.Core;
+using Xunit;
+
+namespace Sonar.Core.Tests;
+
+public class SimulationConfigTests
+{
+    /// Configuración de trabajo válida. Los valores definitivos salen de M1.
+    private static SimulationConfig Valid() => new()
+    {
+        TickDurationSeconds = 1.0 / 60.0,
+        MaxCatchUpTicks = 5,
+        DeadZoneRadius = 0.10,
+        BandOuterRadii = new[] { 0.28, 0.46, 0.64, 0.82, 1.00 },
+        SweepPeriodSeconds = 3.5,
+        TorpedoSpeed = 0.70,
+        HitRadius = 0.040,
+        BlastRadius = 0.100,
+        NearMissRadius = 0.160,
+        EnemyTorpedoSpeed = 0.45,
+        EnemyFireIntervalTicks = 420,
+        EnemyFireStaggerTicks = 70,
+        SubHitRadius = 0.045,
+        DefenseRadius = 0.070,
+        DefenseCapacity = 3,
+        MagazineSize = 4,
+        AmmoReserve = 12,
+        ReloadTicks = 300,
+    };
+
+    [Fact]
+    public void Validate_AcceptsWorkingConfiguration()
+    {
+        Valid().Validate();   // no debe lanzar
+    }
+
+    [Fact]
+    public void Validate_RejectsHitRadiusSmallerThanPerTickTravel()
+    {
+        // 0.70 * (1/60) ≈ 0.01167 — un HitRadius menor permite atravesar contactos.
+        var config = Valid() with { HitRadius = 0.005 };
+        var ex = Assert.Throws<ArgumentException>(config.Validate);
+        Assert.Contains("HitRadius", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_RejectsSubHitRadiusSmallerThanEnemyPerTickTravel()
+    {
+        var config = Valid() with { SubHitRadius = 0.003 };
+        var ex = Assert.Throws<ArgumentException>(config.Validate);
+        Assert.Contains("SubHitRadius", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_RejectsDefenseRadiusSmallerThanEnemyPerTickTravel()
+    {
+        var config = Valid() with { DefenseRadius = 0.004 };
+        var ex = Assert.Throws<ArgumentException>(config.Validate);
+        Assert.Contains("DefenseRadius", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_RejectsBlastRadiusSmallerThanHitRadius()
+    {
+        var config = Valid() with { BlastRadius = 0.020 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsNearMissRadiusNotGreaterThanBlastRadius()
+    {
+        var config = Valid() with { NearMissRadius = 0.100 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsSubHitRadiusOutsideDeadZone()
+    {
+        // El submarino debe ser alcanzable dentro de la zona donde sus propios
+        // torpedos no pueden estar armados.
+        var config = Valid() with { SubHitRadius = 0.20 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsNonIncreasingBandRadii()
+    {
+        var config = Valid() with { BandOuterRadii = new[] { 0.28, 0.20, 0.64 } };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsNonPositiveFireInterval()
+    {
+        var config = Valid() with { EnemyFireIntervalTicks = 0 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void BandLayout_IsBuiltFromConfiguredRadii()
+    {
+        var layout = Valid().BuildBandLayout();
+        Assert.Equal(5, layout.Count);
+        Assert.Equal(0.10, layout.DeadZoneRadius, precision: 10);
+    }
+}
