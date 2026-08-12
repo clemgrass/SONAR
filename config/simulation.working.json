@@ -1,0 +1,20 @@
+{
+  "tickDurationSeconds": 0.016666666666666666,
+  "maxCatchUpTicks": 5,
+  "deadZoneRadius": 0.10,
+  "bandOuterRadii": [0.28, 0.46, 0.64, 0.82, 1.00],
+  "sweepPeriodSeconds": 3.5,
+  "torpedoSpeed": 0.70,
+  "hitRadius": 0.040,
+  "blastRadius": 0.100,
+  "nearMissRadius": 0.160,
+  "enemyTorpedoSpeed": 0.45,
+  "enemyFireIntervalTicks": 420,
+  "enemyFireStaggerTicks": 70,
+  "subHitRadius": 0.045,
+  "defenseRadius": 0.070,
+  "defenseCapacity": 3,
+  "magazineSize": 4,
+  "ammoReserve": 12,
+  "reloadTicks": 300
+}
