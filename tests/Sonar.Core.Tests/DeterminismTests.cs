@@ -32,6 +32,10 @@ public class DeterminismTests
         a.Run(3600);
         b.Run(3600);
 
+        // Sin esto el test sería vacuo: dos flujos vacíos también son iguales. Verifica
+        // además que el guion se aplique en ticks absolutos y no se reinicie por llamada.
+        Assert.NotEmpty(a.Events);
+
         Assert.Equal(a.Events.Count, b.Events.Count);
         for (var i = 0; i < a.Events.Count; i++) Assert.Equal(a.Events[i], b.Events[i]);
     }
