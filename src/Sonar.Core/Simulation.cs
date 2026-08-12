@@ -100,8 +100,8 @@ public sealed class Simulation : ISimulation
         // 9 · Impactos sobre el submarino
         sub = ResolveSubHits(sub, torpedoes, events, state.Tick);
 
-        // 10 · Barrido
-        var sonar = AdvanceSweep(state, dt);
+        // 10 · Barrido y registro de lecturas
+        var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt);
 
         // 11 · Recarga
         sub = AdvanceReload(sub, state.Tick, events);
@@ -452,11 +452,51 @@ public sealed class Simulation : ISimulation
         }
     }
 
-    private Sensing.SonarState AdvanceSweep(WorldState state, double dt)
+    /// <summary>
+    /// Avanza el haz y registra lecturas. Solo los contactos están sujetos a gating:
+    /// torpedos propios, defensas, torpedos enemigos y detonaciones entran al snapshot
+    /// siempre (spec §4.1).
+    ///
+    /// Se guarda una sola lectura por contacto, la más reciente. Interpretar posiciones
+    /// sucesivas es trabajo del jugador con su cuaderno, no del juego mostrando una traza:
+    /// mostrarla convertiría la extrapolación en lectura pasiva y vaciaría la habilidad
+    /// central que M1 está validando (TDD §5.2).
+    /// </summary>
+    private Sensing.SonarState AdvanceSweepAndRecord(
+        Sensing.SonarState sonar, List<Contact> contacts, int tick, double dt)
     {
-        if (!state.Sonar.SweepRunning) return state.Sonar;
-        var degreesPerSecond = 360.0 / _config.SweepPeriodSeconds;
-        var advanced = (state.Sonar.SweepDegrees + degreesPerSecond * dt) % 360.0;
-        return state.Sonar with { SweepDegrees = advanced };
+        var readings = sonar.Readings.ToList();
+
+        // Retirar lecturas de contactos que ya no existen o murieron.
+        readings.RemoveAll(r => !contacts.Any(c => c.Alive && c.Id == r.ContactId));
+
+        if (!sonar.SweepRunning)
+            return sonar with { Readings = readings.OrderBy(r => r.ContactId.Value).ToArray() };
+
+        var previous = sonar.SweepDegrees;
+        var current = (previous + 360.0 / _config.SweepPeriodSeconds * dt) % 360.0;
+
+        foreach (var contact in contacts)
+        {
+            if (!contact.Alive) continue;
+            if (contact.Position.Length > 1.0) continue;
+
+            var bearing = Bearing.FromVector(contact.Position).Degrees;
+            if (!Sensing.SweepCrossing.Crossed(previous, current, bearing)) continue;
+
+            readings.RemoveAll(r => r.ContactId == contact.Id);
+            readings.Add(new Sensing.Reading
+            {
+                ContactId = contact.Id,
+                Position = contact.Position,
+                ObservedAtTick = tick,
+            });
+        }
+
+        return sonar with
+        {
+            SweepDegrees = current,
+            Readings = readings.OrderBy(r => r.ContactId.Value).ToArray(),
+        };
     }
 }
