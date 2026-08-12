@@ -159,8 +159,55 @@ public sealed class Simulation : ISimulation
         List<Contact> contacts, List<Torpedo> torpedoes, List<Defense> defenses,
         List<GameEvent> events, int tick) { }
 
+    /// <summary>
+    /// Torpedo propio que agotó su corrida: detona con radio de explosión en el punto
+    /// nominal de la banda. Puede destruir más de un contacto — limitarlo a uno exigiría
+    /// una regla de desempate arbitraria (TDD §4.3).
+    /// </summary>
     private void ResolveRunOuts(
-        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
+        List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events, int tick)
+    {
+        for (var t = torpedoes.Count - 1; t >= 0; t--)
+        {
+            var torpedo = torpedoes[t];
+            if (torpedo.Side != TorpedoSide.Own) continue;
+            if (torpedo.Position.Length < torpedo.RunToRadius) continue;
+
+            var point = torpedo.Bearing.ToUnitVector() * torpedo.RunToRadius;
+            var killed = false;
+            var nearestSurvivor = double.MaxValue;
+            var nearestSurvivorId = -1;
+
+            for (var c = 0; c < contacts.Count; c++)
+            {
+                var contact = contacts[c];
+                if (!contact.Alive) continue;
+
+                var distance = Vec2.Distance(point, contact.Position);
+                if (distance < _config.BlastRadius)
+                {
+                    contacts[c] = contact with { Alive = false };
+                    events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
+                        DestructionCause.Blast));
+                    killed = true;
+                }
+                else if (distance < nearestSurvivor)
+                {
+                    nearestSurvivor = distance;
+                    nearestSurvivorId = contact.Id.Value;
+                }
+            }
+
+            events.Add(new TorpedoDetonated(tick, point, killed));
+
+            // Casi-impacto: cerca como para ser intencional, lejos como para no destruir.
+            // Base mecánica de la pista 2 (spec §4.10). Sin efecto en M1.
+            if (!killed && nearestSurvivorId >= 0 && nearestSurvivor < _config.NearMissRadius)
+                events.Add(new NearMiss(tick, nearestSurvivorId, nearestSurvivor));
+
+            torpedoes.RemoveAt(t);
+        }
+    }
 
     private PlayerSub ResolveSubHits(
         PlayerSub sub, List<Torpedo> torpedoes, List<GameEvent> events, int tick) => sub;
