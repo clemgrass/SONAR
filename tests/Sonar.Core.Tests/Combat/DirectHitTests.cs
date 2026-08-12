@@ -92,6 +92,20 @@ public class DirectHitTests
 
         Assert.DoesNotContain(events, e => e is ContactDestroyed);
         Assert.Single(sim.State.Contacts);
+
+        // Control positivo. Sin esto el test pasaría por vacuidad: afirmar la ausencia de
+        // un evento es trivialmente cierto si el combate entero está roto. El mismo disparo
+        // contra un contacto justo fuera de la zona muerta debe matarlo — lo que prueba que
+        // al de adentro lo salva la zona muerta y no una avería del sistema.
+        var control = TestWorld.Still(config);
+        var bandACenter = config.BuildBandLayout().CenterRadius(new Band(0));
+        control.SetContacts(new[] { EnemyAt(1, new Vec2(bandACenter, 0.0)) });
+
+        var controlEvents = new List<GameEvent>(control.Tick(Fire(90, 0)));
+        for (var i = 0; i < 120; i++) controlEvents.AddRange(control.Tick(NoCommands));
+
+        Assert.Contains(controlEvents, e => e is ContactDestroyed);
+        Assert.Empty(control.State.Contacts);
     }
 
     [Fact]
