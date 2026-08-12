@@ -30,17 +30,17 @@ architecture:
 
 progress:
   plan_1_foundation: done          # 10/10 tareas, 78 tests
-  plan_2_world_tick: not_started
-  plan_3_combat_threat: not_started
+  plan_2_world_tick: done          # 10/10 tareas, 120 tests
+  plan_3_combat_threat: in_progress # 6/10 tareas, 146 tests
   plan_4_sonar_controller_godot: not_started
 
 systems:
   spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
   config_and_validation: done
   random_source: done
-  entities: not_started
-  tick_loop: not_started
-  combat: not_started
+  entities: done
+  tick_loop: done
+  combat: in_progress              # falta recarga y colisiones entre torpedos
   enemy_threat: not_started
   sonar_gating: not_started
   controller: not_started

@@ -155,9 +155,48 @@ public sealed class Simulation : ISimulation
     private void ResolveTorpedoCollisions(
         List<Torpedo> torpedoes, List<GameEvent> events, int tick) { }
 
+    /// <summary>
+    /// Una defensa destruye cualquier torpedo — propio o ajeno — y cualquier contacto
+    /// enemigo que la toque. La defensa sobrevive. Es el §24 del GDD.
+    ///
+    /// Los contactos inertes la atraviesan sin sufrir nada, y eso no es una excepción
+    /// menor: la anomalía del §25 sólo es observable si el jugador puede dejar una defensa
+    /// junto a un pecio y mirarlos separarse. Si la defensa se comiera el pecio, el
+    /// experimento que revela la anomalía la borraría (ver spec §4.9 y DefenseAnomalyTests).
+    /// Un pecio además ya está hundido: no hay nada que destruirle.
+    /// </summary>
     private void ResolveDefenseCollisions(
         List<Contact> contacts, List<Torpedo> torpedoes, List<Defense> defenses,
-        List<GameEvent> events, int tick) { }
+        List<GameEvent> events, int tick)
+    {
+        foreach (var defense in defenses)
+        {
+            if (!defense.Alive) continue;
+
+            for (var c = 0; c < contacts.Count; c++)
+            {
+                var contact = contacts[c];
+                if (!contact.Alive || contact.Kind != ContactKind.Enemy) continue;
+                if (Vec2.Distance(defense.Position, contact.Position) >= _config.DefenseRadius) continue;
+
+                contacts[c] = contact with { Alive = false };
+                events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
+                    DestructionCause.Defense));
+            }
+
+            for (var t = torpedoes.Count - 1; t >= 0; t--)
+            {
+                var torpedo = torpedoes[t];
+                if (Vec2.Distance(defense.Position, torpedo.Position) >= _config.DefenseRadius) continue;
+
+                if (torpedo.Side == TorpedoSide.Enemy)
+                    events.Add(new EnemyTorpedoDestroyed(tick, torpedo.Id.Value, torpedo.Position,
+                        DestructionCause.Defense));
+
+                torpedoes.RemoveAt(t);
+            }
+        }
+    }
 
     /// <summary>
     /// Torpedo propio que agotó su corrida: detona con radio de explosión en el punto
@@ -273,7 +312,23 @@ public sealed class Simulation : ISimulation
                 };
             }
 
-            // DeployDefenseCommand llega en el Plan 3, Tarea 6.
+            case DeployDefenseCommand deploy:
+            {
+                if (state.Sub.DefensesAvailable <= 0)
+                {
+                    events.Add(new DefenseRejected(state.Tick, RejectionReason.NoneAvailable));
+                    return state;
+                }
+
+                var (id, advanced) = state.TakeEntityId();
+                var position = deploy.Target.ToPosition(_layout);
+                events.Add(new DefenseDeployed(state.Tick, id, position));
+
+                return advanced
+                    .WithDefenses(advanced.Defenses.Append(Defense.Create(new DefenseId(id), position)))
+                    with { Sub = advanced.Sub with { DefensesAvailable = advanced.Sub.DefensesAvailable - 1 } };
+            }
+
             default:
                 return state;
         }
