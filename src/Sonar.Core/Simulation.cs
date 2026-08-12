@@ -119,9 +119,37 @@ public sealed class Simulation : ISimulation
 
     // --- Fases. Se llenan en las tareas siguientes de este plan. ---
 
+    /// <summary>
+    /// IA mínima de M1: cada enemigo dispara recto hacia el origen a intervalos fijos.
+    /// No evade, no persigue y no elige blanco — el §63.11 completo va a un milestone
+    /// posterior. Lo que M1 mide es al jugador bajo presión, no la inteligencia del enemigo.
+    /// </summary>
     private WorldState FireEnemyTorpedoes(
         WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)
-        => state;
+    {
+        for (var i = 0; i < contacts.Count; i++)
+        {
+            var contact = contacts[i];
+            if (!contact.Alive) continue;
+            if (contact.Kind != ContactKind.Enemy) continue;
+            if (state.Tick < contact.NextFireTick) continue;
+            if (contact.Position.Length > 1.0) continue;
+
+            var (id, advanced) = state.TakeEntityId();
+            state = advanced;
+
+            torpedoes.Add(Torpedo.CreateEnemy(
+                new TorpedoId(id), contact.Position, _config.EnemyTorpedoSpeed));
+            events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
+
+            contacts[i] = contact with
+            {
+                NextFireTick = state.Tick + _config.EnemyFireIntervalTicks,
+            };
+        }
+
+        return state;
+    }
 
     /// <summary>
     /// Torpedos en orden de id ascendente; para cada uno, contactos en orden de id
