@@ -1,9 +1,6 @@
 ; Engine configuration file.
 ; Generado a mano, no por el editor: así queda bajo control de versiones desde el
 ; primer commit y no depende de que alguien repita los mismos clics.
-;
-; La escena principal (run/main_scene) la agrega la Tarea 9 del plan 4, junto con
-; Main.tscn. Hasta entonces el proyecto abre en el editor pero no corre.
 
 config_version=5
 
@@ -11,6 +8,7 @@ config_version=5
 
 config/name="Sonar"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+run/main_scene="res://Main.tscn"
 
 [dotnet]
 
@@ -20,6 +18,12 @@ project/assembly_name="Sonar.Game"
 
 window/size/viewport_width=1280
 window/size/viewport_height=800
+
+; El layout está calculado para 1280x800. Con canvas_items la escena se escala entera al
+; redimensionar en vez de recortarse, que en una pantalla HiDPI es la diferencia entre ver
+; el scope completo y ver un cuarto de él.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
 
 [rendering]
 

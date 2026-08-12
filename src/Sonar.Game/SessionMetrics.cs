@@ -21,6 +21,7 @@ public sealed class SessionMetrics
 
     public int ShotsFired { get; private set; }
     public int ContactsDestroyed { get; private set; }
+    public int Commands => _composeTimes.Count;
 
     public double AverageComposeSeconds =>
         _composeTimes.Count == 0 ? 0 : _composeTimes.Average();

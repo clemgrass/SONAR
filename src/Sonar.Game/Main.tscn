@@ -1,0 +1,57 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Main.cs" id="1_main"]
+[ext_resource type="Script" path="res://SonarView.cs" id="2_sonar"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0156863, 0.0705882, 0.0392157, 1)
+
+[node name="LogPanel" type="ColorRect" parent="."]
+offset_left = 788.0
+offset_top = 44.0
+offset_right = 1264.0
+offset_bottom = 714.0
+color = Color(0.0352941, 0.121569, 0.0745098, 1)
+
+[node name="SonarView" type="Node2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(400, 370)
+script = ExtResource("2_sonar")
+
+[node name="Hud" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 20.0
+offset_top = 12.0
+offset_right = 780.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(0.784314, 1, 0.878431, 1)
+theme_override_font_sizes/font_size = 18
+text = "tick 0"
+
+[node name="Log" type="RichTextLabel" parent="."]
+unique_name_in_owner = true
+offset_left = 802.0
+offset_top = 54.0
+offset_right = 1252.0
+offset_bottom = 704.0
+theme_override_font_sizes/normal_font_size = 15
+bbcode_enabled = true
+scroll_following = true
+
+[node name="CommandInput" type="LineEdit" parent="."]
+unique_name_in_owner = true
+offset_left = 20.0
+offset_top = 736.0
+offset_right = 1264.0
+offset_bottom = 780.0
+theme_override_colors/font_color = Color(0.992157, 0.878431, 0.278431, 1)
+theme_override_font_sizes/font_size = 20
+placeholder_text = "C047"
+caret_blink = true

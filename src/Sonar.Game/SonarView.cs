@@ -1,0 +1,161 @@
+using Godot;
+using Sonar.Controller.Presentation;
+
+namespace Sonar.Game;
+
+/// <summary>
+/// Dibuja el snapshot. No sabe nada de reglas: no decide si un disparo acierta, no mide
+/// tiempo, no genera azar. Solo pinta lo que el Controller le entrega.
+///
+/// Deliberadamente feo: M1 valida si extrapolar lecturas es divertido, no si se ve bien.
+/// Pulir esto es señal de haberse salido del milestone.
+/// </summary>
+public partial class SonarView : Node2D
+{
+    private static readonly Color Grid = new(0.29f, 0.87f, 0.50f, 0.28f);
+    private static readonly Color GridStrong = new(0.35f, 0.95f, 0.58f, 0.80f);
+    private static readonly Color DeadZone = new(1.0f, 0.42f, 0.42f, 0.35f);
+    private static readonly Color Label = new(0.78f, 1.0f, 0.88f);
+    private static readonly Color ContactColor = new(0.36f, 1.0f, 0.61f);
+    private static readonly Color OwnTorpedo = new(1.0f, 0.82f, 0.36f);
+    private static readonly Color EnemyTorpedo = new(1.0f, 0.36f, 0.36f);
+    private static readonly Color DefenseColor = new(0.56f, 0.83f, 1.0f);
+    private static readonly Color SubColor = new(0.95f, 1.0f, 0.97f);
+
+    /// <summary>
+    /// Radio del scope en píxeles. Con el centro en (400, 370) del viewport de 1280x800,
+    /// los rótulos de marcación quedan en y≈694 y el campo de comandos arranca en 738:
+    /// crecer este número los hace chocar.
+    /// </summary>
+    private const float Radius = 300f;
+
+    private const int LabelSize = 15;
+
+    /// <summary>Ticks de una vuelta completa del haz, para atenuar por edad.</summary>
+    private const float SweepTicks = 210f;
+
+    private WorldSnapshot? _snapshot;
+
+    /// <summary>Radios de banda normalizados y radio de zona muerta. Los fija Main desde la config.</summary>
+    private double[] _bandOuterRadii = { 0.28, 0.46, 0.64, 0.82, 1.00 };
+    private double _deadZoneRadius = 0.10;
+
+    private Font _font = null!;
+
+    public override void _Ready() => _font = ThemeDB.FallbackFont;
+
+    public void SetGeometry(double deadZoneRadius, double[] bandOuterRadii)
+    {
+        _deadZoneRadius = deadZoneRadius;
+        _bandOuterRadii = bandOuterRadii;
+    }
+
+    public void SetSnapshot(WorldSnapshot snapshot)
+    {
+        _snapshot = snapshot;
+        QueueRedraw();
+    }
+
+    /// <summary>
+    /// Espacio de simulación a píxeles. El submarino está en el origen y la marcación 0 es
+    /// el norte, o sea (0,-1) — que coincide con el eje Y hacia abajo de Godot.
+    /// </summary>
+    private static Vector2 ToScreen(Sonar.Core.Spatial.Vec2 v) =>
+        new((float)v.X * Radius, (float)v.Y * Radius);
+
+    private static Vector2 BearingToDirection(float degrees)
+    {
+        var rad = Mathf.DegToRad(degrees);
+        return new Vector2(Mathf.Sin(rad), -Mathf.Cos(rad));
+    }
+
+    public override void _Draw()
+    {
+        if (_snapshot is not { } snap) return;
+
+        DrawGrid();
+        DrawSweep(snap);
+        DrawContacts(snap);
+        DrawOwnTorpedoes(snap);
+        DrawEnemyTorpedoes(snap);
+
+        foreach (var defense in snap.Defenses)
+            DrawArc(ToScreen(defense.Position), 11f, 0, Mathf.Tau, 24, DefenseColor, 2.5f);
+
+        DrawCircle(Vector2.Zero, 6f, SubColor);
+    }
+
+    private void DrawGrid()
+    {
+        // Zona muerta: dentro de este radio ningún torpedo propio está armado. Se dibuja
+        // porque explica visualmente por qué un disparo a quemarropa no hace nada.
+        DrawArc(Vector2.Zero, (float)_deadZoneRadius * Radius, 0, Mathf.Tau, 48, DeadZone, 2f);
+
+        for (var i = 0; i < _bandOuterRadii.Length; i++)
+        {
+            var outer = (float)_bandOuterRadii[i] * Radius;
+            var last = i == _bandOuterRadii.Length - 1;
+            DrawArc(Vector2.Zero, outer, 0, Mathf.Tau, 96, last ? GridStrong : Grid, last ? 2.5f : 1.5f);
+
+            // Letra de la banda, sobre el eje este, en el centro de la banda.
+            var inner = i == 0 ? (float)_deadZoneRadius * Radius : (float)_bandOuterRadii[i - 1] * Radius;
+            DrawString(_font, new Vector2((inner + outer) / 2f - 5f, -6f),
+                ((char)('A' + i)).ToString(), HorizontalAlignment.Left, -1, LabelSize,
+                new Color(Label, 0.45f));
+        }
+
+        for (var d = 0; d < 360; d += 30)
+        {
+            var dir = BearingToDirection(d);
+            DrawLine(dir * (Radius - 16), dir * Radius, GridStrong, 2f);
+            DrawString(_font, dir * (Radius + 24) + new Vector2(-14, 5), d.ToString("D3"),
+                HorizontalAlignment.Center, -1, LabelSize, Label);
+        }
+    }
+
+    private void DrawSweep(WorldSnapshot snap)
+    {
+        var dir = BearingToDirection((float)snap.SweepDegrees);
+        DrawLine(Vector2.Zero, dir * Radius, snap.SweepRunning ? GridStrong : Grid, 2.5f);
+    }
+
+    private void DrawContacts(WorldSnapshot snap)
+    {
+        // Posición de la LECTURA, no la real. Atenuada por edad: cuanto más vieja la
+        // lectura, menos confiable la extrapolación. Es el juego entero.
+        foreach (var contact in snap.Contacts)
+        {
+            var freshness = Mathf.Clamp(1f - contact.AgeTicks / SweepTicks, 0.22f, 1f);
+            var position = ToScreen(contact.Position);
+
+            DrawCircle(position, 7f, new Color(ContactColor, freshness));
+            DrawString(_font, position + new Vector2(-26, -14),
+                $"{contact.BandLetter}{contact.BearingDegrees:D3}",
+                HorizontalAlignment.Left, -1, LabelSize, new Color(Label, freshness));
+        }
+    }
+
+    private void DrawOwnTorpedoes(WorldSnapshot snap)
+    {
+        foreach (var torpedo in snap.Torpedoes)
+        {
+            var position = ToScreen(torpedo.Position);
+            DrawLine(Vector2.Zero, position, new Color(OwnTorpedo, 0.5f), 2f);
+            DrawCircle(position, 4.5f, OwnTorpedo);
+
+            // Punto de detonación por fin de corrida: hace legible la decisión de banda.
+            var mark = BearingToDirection(torpedo.BearingDegrees) * (float)torpedo.RunToRadius * Radius;
+            DrawArc(mark, 14f, 0, Mathf.Tau, 24, new Color(OwnTorpedo, 0.40f), 1.5f);
+        }
+    }
+
+    private void DrawEnemyTorpedoes(WorldSnapshot snap)
+    {
+        foreach (var torpedo in snap.EnemyTorpedoes)
+        {
+            var p = ToScreen(torpedo.Position);
+            DrawLine(p + new Vector2(-7, -7), p + new Vector2(7, 7), EnemyTorpedo, 3f);
+            DrawLine(p + new Vector2(-7, 7), p + new Vector2(7, -7), EnemyTorpedo, 3f);
+        }
+    }
+}

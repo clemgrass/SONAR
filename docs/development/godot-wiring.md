@@ -262,37 +262,35 @@ La semilla fija hace la sesión reproducible. Cambiarla cambia el escenario.
 
 ### Contactos de apertura
 
+Viven en `Sonar.Controller/OpeningScenario.cs`, no en el proyecto de Godot, para que los
+tests ejerciten el escenario **real** en vez de una copia. Una copia se desincroniza y deja
+de probar lo que se juega.
+
 ```csharp
-private static IEnumerable<Contact> BuildOpeningContacts(SimulationConfig config)
-{
-    var spawner = new ContactSpawner(config);
-    var enemies = spawner.SpawnEnemies(
-        spawnTick: 0, firstId: 100,
-        positions: new[]
-        {
-            new Vec2(0.10, -0.78), new Vec2(0.74, 0.18),
-            new Vec2(-0.62, 0.44), new Vec2(-0.30, -0.70),
-        },
-        velocities: new[]
-        {
-            new Vec2(0.03, 0.06), new Vec2(-0.07, 0.02),
-            new Vec2(0.05, -0.04), new Vec2(0.04, 0.05),
-        });
-
-    foreach (var enemy in enemies) yield return enemy;
-
-    // Referencia inerte: deriva con el mundo mientras las defensas no.
-    // Es lo que hace legible la anomalía del §25 — ver spec §4.9.
-    yield return Contact.CreateInert(new ContactId(200), new Vec2(0.55, 0.55));
-}
+_controller = new GameController(
+    config, seed: 20260811, OpeningScenario.Course, OpeningScenario.SubSpeed);
+_controller.SetContacts(OpeningScenario.Contacts(config));
 ```
+
+Tres cosas de ese archivo importan más de lo que parece, y las tres se descubrieron
+jugando, no razonando:
+
+1. **`SubSpeed` fija cuánto dura un encuentro.** La deriva del mundo se suma a la velocidad
+   de *todos* los contactos, así que las velocidades propias tienen que casi cancelarla. Con
+   las del plan original, un enemigo caía encima del submarino en siete segundos.
+2. **`FirstFireGraceTicks` retrasa el primer disparo enemigo.** Sin él el jugador moría en el
+   tick 582 sin haber alcanzado a leer dos barridos, y M1 no puede medir si extrapolar es
+   satisfactorio si nunca se llega a extrapolar.
+3. **El pecio inerte no es decorado.** No tiene velocidad propia, así que recibe la deriva
+   pura y cruza el scope de norte a sur. Sin una referencia que sí derive, la anomalía de
+   las defensas no se puede leer.
 
 `ContactSpawner` escalona los tiempos de disparo. Sin escalonar, los cuatro enemigos
 dispararían en el mismo tick y la presión llegaría en oleadas sincronizadas en vez de
 sostenida.
 
-El contacto inerte no es decorado: sin una referencia que sí derive, la anomalía de las
-defensas no se puede leer.
+Estos números son material de M1: la pregunta 3 se responde tocándolos y volviendo a jugar.
+Lo pinchan `OpeningScenarioTests`, que fallan si el escenario se vuelve a degenerar.
 
 ---
 
