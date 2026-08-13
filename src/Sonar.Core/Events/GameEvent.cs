@@ -33,6 +33,22 @@ public sealed record NearMiss(int Tick, int ContactId, double Distance) : GameEv
 
 public sealed record FireRejected(int Tick, RejectionReason Reason) : GameEvent(Tick);
 
+/// <summary>
+/// Medición del disparo en el instante de lanzarlo, contra la verdad del mundo.
+/// **Sólo telemetría: no se muestra al jugador.** Mostrarlo le entregaría gratis la
+/// corrección que el juego le pide calcular.
+///
+/// `ErrorDegrees` es la separación angular al contacto vivo más cercano en marcación;
+/// `ErrorRadius`, la diferencia entre el centro de la banda pedida y el radio real de ese
+/// contacto; `ReadingAgeTicks`, cuán vieja era la lectura que el jugador podía ver, o -1 si
+/// ese contacto todavía no había sido barrido nunca.
+///
+/// Juntos dan la curva de extrapolación, que es la respuesta a la pregunta 1 de M1.
+/// </summary>
+public sealed record ShotAssessed(
+    int Tick, int TorpedoId, int NearestContactId,
+    double ErrorDegrees, double ErrorRadius, int ReadingAgeTicks) : GameEvent(Tick);
+
 // --- Defensa ---
 public sealed record DefenseDeployed(int Tick, int DefenseId, Vec2 Position) : GameEvent(Tick);
 public sealed record DefenseRejected(int Tick, RejectionReason Reason) : GameEvent(Tick);

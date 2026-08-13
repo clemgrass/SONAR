@@ -433,6 +433,46 @@ public sealed class Simulation : ISimulation
         return reloaded;
     }
 
+    /// <summary>
+    /// Mide el disparo contra la verdad. Vive en Core y no en la presentación porque
+    /// necesita la posición real del contacto, que el snapshot esconde a propósito: subir
+    /// ese dato rompería la defensa central del diseño.
+    /// </summary>
+    private void AssessShot(WorldState state, TargetCoordinate target, int torpedoId,
+        List<GameEvent> events)
+    {
+        var firedBearing = (double)target.Bearing.Degrees;
+
+        Contact? nearest = null;
+        var bestSeparation = double.MaxValue;
+
+        foreach (var contact in state.Contacts)
+        {
+            if (!contact.Alive) continue;
+            var separation = Bearing.Separation(firedBearing, Bearing.DegreesOf(contact.Position));
+            if (separation >= bestSeparation) continue;
+            bestSeparation = separation;
+            nearest = contact;
+        }
+
+        // Disparar al vacío no tiene contra qué medirse. Se omite en vez de inventar un
+        // valor sentinela que después contamine los promedios.
+        if (nearest is null) return;
+
+        var age = -1;
+        foreach (var reading in state.Sonar.Readings)
+        {
+            if (reading.ContactId != nearest.Id) continue;
+            age = state.Tick - reading.ObservedAtTick;
+            break;
+        }
+
+        events.Add(new ShotAssessed(state.Tick, torpedoId, nearest.Id.Value,
+            bestSeparation,
+            System.Math.Abs(_layout.CenterRadius(target.Band) - nearest.Position.Length),
+            age));
+    }
+
     private WorldState ApplyCommand(WorldState state, Command command, List<GameEvent> events)
     {
         switch (command)
@@ -472,6 +512,8 @@ public sealed class Simulation : ISimulation
 
                 events.Add(new TorpedoFired(state.Tick, id,
                     fire.Target.Bearing.Degrees, fire.Target.Band.Letter));
+
+                AssessShot(state, fire.Target, id, events);
 
                 return advanced
                     .WithTorpedoes(advanced.Torpedoes.Append(torpedo))
