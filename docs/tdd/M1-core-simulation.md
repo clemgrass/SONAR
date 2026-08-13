@@ -449,14 +449,31 @@ de primer impacto de §3.3.
 
 ```
 para cada contacto Enemy vivo y dentro de rango, en orden de ContactId:
-    si Tick >= contacto.NextFireTick:
+    si Tick >= contacto.NextFireTick
+       y no existe torpedo Enemy con SourceContactId == contacto.Id:
         crear Torpedo con Side = Enemy
-            Position  = contacto.Position
-            Direction = normalizar(origen - contacto.Position)   // recto hacia el submarino
-            Speed     = config.EnemyTorpedoSpeed
-        contacto.NextFireTick = Tick + config.EnemyFireIntervalTicks
+            Position        = contacto.Position
+            Direction       = normalizar(origen - contacto.Position)  // recto al submarino
+            Speed           = config.EnemyTorpedoSpeed
+            SourceContactId = contacto.Id
+        contacto.NextFireTick = Tick + config.ReloadTicks
         emitir EnemyTorpedoFired(contacto.Id)
 ```
+
+`[DECIDED]` **El enemigo juega con las mismas reglas de munición que el jugador.** Un solo torpedo
+en el agua a la vez, y tras disparar tarda `config.ReloadTicks` en recargar — el mismo reloj que
+cuesta a este lado.
+
+Con torpedos lentos el límite que manda es el primero: mientras su torpedo siga viajando, ese
+enemigo no vuelve a disparar aunque haya recargado hace rato. Eso hace que interceptar un torpedo
+con una defensa o con un torpedo propio no sólo salve el impacto, sino que además **libere al
+enemigo para disparar de nuevo** — un costo que vale la pena tener presente al afinar M1.
+
+Por eso `Torpedo` lleva `SourceContactId`: es lo que permite responder "¿este enemigo ya tiene uno
+en el agua?".
+
+`[DECIDED]` **`EnemyFireIntervalTicks` ya no gobierna la cadencia.** Sólo lo usa `ContactSpawner`
+para decidir cuándo un contacto recién aparecido queda armado por primera vez.
 
 `[DECIDED]` **Dispara hacia dónde está el submarino, no hacia dónde estará.** El submarino está
 fijo en el origen, así que la distinción no existe: el torpedo enemigo viaja recto por la marcación
@@ -504,8 +521,14 @@ submarino se confirma siempre.** No depende del barrido, y el evento se emite en
 - `ReloadInProgress = true`, `ReloadCompletesAtTick = Tick + config.ReloadTicks`
 - Evento `ReloadStarted`
 
-Al alcanzarse el tick: mueve `min(config.MagazineSize - AmmoLoaded, AmmoReserve)` de reserva a
-cargador, `ReloadInProgress = false`, evento `ReloadCompleted`.
+Al alcanzarse el tick: mueve **un** torpedo de reserva a cargador —
+`min(1, config.MagazineSize - AmmoLoaded, AmmoReserve)` —, `ReloadInProgress = false`, evento
+`ReloadCompleted`.
+
+`[DECIDED]` **Carga un torpedo por recarga, no llena el cargador.** Con tres tubos y siete segundos
+por tubo, quedarse en cero cuesta veintiún segundos de trabajo repetido en vez de una sola espera:
+disparar el tercero pasa a ser una decisión y no un trámite. Es la misma regla que respetan los
+enemigos (§4.6).
 
 `[DECIDED]` La recarga **no se puede interrumpir ni cancelar** en M1. El §63.9 pregunta por
 interrupción y fallo de recarga; ambas son mecánicas de tensión que dependen del sistema de daño,

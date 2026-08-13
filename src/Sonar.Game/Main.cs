@@ -94,10 +94,16 @@ public partial class Main : Node
     private int _frame;
     private bool _sawStatus;
 
-    private static void TypeText(string text)
-    {
-        foreach (var c in text) TypeKey((Key)char.ToUpperInvariant(c), c);
-    }
+    /// <summary>
+    /// Guion tecleado, una tecla por paso. `\n` es Enter. Va en minúscula a propósito: así
+    /// el arnés comprueba de paso la conversión a mayúsculas.
+    /// </summary>
+    private const string SelfTestScript = "c047\nstatus\n";
+
+    private const int SettleFrames = 30;
+    private const int FramesPerKey = 3;
+
+    private int _scriptIndex;
 
     private static void TypeKey(Key keycode, char unicode = '\0')
     {
@@ -112,18 +118,29 @@ public partial class Main : Node
 
     private void RunSelfTest()
     {
+        // El contador no avanza hasta que el terminal esté de verdad en modo edición.
+        // Durante los primeros frames Godot todavía está levantando la ventana y pierde
+        // eventos inyectados: contar desde ahí hacía fallar el arnés dos de cada tres
+        // veces, y un guardián intermitente es peor que ninguno porque se termina ignorando.
+        if (!_input.IsEditing()) return;
+
         _frame++;
-        switch (_frame)
+        if (_frame < SettleFrames || _frame % FramesPerKey != 0) return;
+
+        // Una tecla por paso, no la palabra entera de golpe. Inyectar varias en el mismo
+        // frame perdía caracteres de forma intermitente. Es un artefacto de la inyección y
+        // no algo que un humano pueda provocar tecleando — nadie escribe cuatro caracteres
+        // en dieciséis milisegundos — pero bastaba para volver inútil al guardián.
+        if (_scriptIndex < SelfTestScript.Length)
         {
-            case 60: TypeText("c047"); break;
-            case 62: TypeKey(Key.Enter); break;
-
-            // Segundo comando sin tocar nada. Acá es donde fallaba.
-            case 90: TypeText("status"); break;
-            case 92: TypeKey(Key.Enter); break;
-
-            case 150: ReportSelfTest(); break;
+            var c = SelfTestScript[_scriptIndex++];
+            if (c == '\n') TypeKey(Key.Enter);
+            else TypeKey((Key)char.ToUpperInvariant(c), c);
+            return;
         }
+
+        // Margen para que el último comando alcance a aplicarse en la simulación.
+        if (_frame > SettleFrames + (SelfTestScript.Length + 20) * FramesPerKey) ReportSelfTest();
     }
 
     private void ReportSelfTest()

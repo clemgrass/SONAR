@@ -227,6 +227,16 @@ Todos heredan de `GameEvent` y traen `int Tick`. Están en `Sonar.Core.Events`.
 `DestructionCause`: `DirectHit`, `Blast`, `Defense`, `TorpedoCollision`.
 `RejectionReason`: `NoAmmo`, `Reloading`, `NoneAvailable`.
 
+### Munición: el enemigo juega con las mismas reglas
+
+Tres tubos, y `RELOAD` carga **uno**. Vaciar el cargador cuesta tres recargas.
+
+Los enemigos igual: un solo torpedo en el agua a la vez y el mismo tiempo de recarga. Con torpedos
+lentos, el límite que manda es el primero — mientras su torpedo viaje, ese enemigo no dispara otro.
+
+Tiene una consecuencia que conviene mostrar bien: interceptar un torpedo enemigo **libera a quien
+lo lanzó** para disparar de nuevo. `EnemyTorpedoDestroyed` no es sólo una buena noticia.
+
 ### La defensa se gasta
 
 `DefenseCapacity` limita cuántas defensas puede haber **desplegadas a la vez**, no cuántas quedan
@@ -315,7 +325,7 @@ Lo pinchan `OpeningScenarioTests`, que fallan si el escenario se vuelve a degene
 |---|---|
 | `C047`, `c47`, `FIRE C047`, `F C047` | Dispara a marcación 047, banda C |
 | `DEF C047`, `DEFEND C047` | Despliega defensa ahí |
-| `RELOAD` | Recarga. **No pausa el mundo**: el haz sigue girando |
+| `RELOAD` | Carga **un** torpedo. **No pausa el mundo**: el haz sigue girando |
 | `SONAR` | Alterna el barrido |
 | `STATUS` | Reporta munición y defensas |
 

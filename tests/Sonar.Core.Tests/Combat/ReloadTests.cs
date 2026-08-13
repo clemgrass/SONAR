@@ -16,11 +16,13 @@ public class ReloadTests
         new Command[] { new FireCommand(new TargetCoordinate(new Bearing(bearing), new Band(band))) };
 
     [Fact]
-    public void Reload_StartsAndCompletesAfterConfiguredTicks()
+    public void Reload_LoadsOneTorpedoPerCycle()
     {
+        // No llena el cargador: carga un tubo. Quedarse en cero cuesta una recarga por
+        // torpedo, así que gastar el último es una decisión y no un trámite.
         var config = TestWorld.Config();
         var sim = TestWorld.Still(config);
-        for (var i = 0; i < 4; i++) sim.Tick(Fire(i * 20, 4));
+        for (var i = 0; i < config.MagazineSize; i++) sim.Tick(Fire(i * 20, 4));
         Assert.Equal(0, sim.State.Sub.AmmoLoaded);
 
         var events = new List<GameEvent>(sim.Tick(new Command[] { new ReloadCommand() }));
@@ -29,10 +31,33 @@ public class ReloadTests
         for (var i = 0; i < config.ReloadTicks; i++) events.AddRange(sim.Tick(NoCommands));
 
         var completed = (ReloadCompleted)Assert.Single(events, e => e is ReloadCompleted);
-        Assert.Equal(4, completed.AmmoLoaded);
-        Assert.Equal(4, sim.State.Sub.AmmoLoaded);
-        Assert.Equal(8, sim.State.Sub.AmmoReserve);
+        Assert.Equal(1, completed.AmmoLoaded);
+        Assert.Equal(1, sim.State.Sub.AmmoLoaded);
+        Assert.Equal(config.AmmoReserve - 1, sim.State.Sub.AmmoReserve);
         Assert.False(sim.State.Sub.ReloadInProgress);
+    }
+
+    [Fact]
+    public void Reload_RepeatedFillsTheMagazineOneAtATime()
+    {
+        var config = TestWorld.Config();
+        var sim = TestWorld.Still(config);
+        for (var i = 0; i < config.MagazineSize; i++) sim.Tick(Fire(i * 20, 4));
+
+        for (var round = 1; round <= config.MagazineSize; round++)
+        {
+            sim.Tick(new Command[] { new ReloadCommand() });
+            for (var i = 0; i < config.ReloadTicks; i++) sim.Tick(NoCommands);
+            Assert.Equal(round, sim.State.Sub.AmmoLoaded);
+        }
+
+        // Con el cargador lleno, recargar de nuevo no consume reserva.
+        var reserve = sim.State.Sub.AmmoReserve;
+        sim.Tick(new Command[] { new ReloadCommand() });
+        for (var i = 0; i < config.ReloadTicks; i++) sim.Tick(NoCommands);
+
+        Assert.Equal(config.MagazineSize, sim.State.Sub.AmmoLoaded);
+        Assert.Equal(reserve, sim.State.Sub.AmmoReserve);
     }
 
     [Fact]

@@ -54,17 +54,46 @@ public class EnemyFireTests
     }
 
     [Fact]
-    public void Enemy_RearmsAfterTheConfiguredInterval()
+    public void Enemy_RearmsAfterTheReloadTime()
     {
+        // Los enemigos recargan con el mismo reloj que el jugador: ReloadTicks.
         var config = TestWorld.Config();
         var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.95), nextFireTick: 0) });
 
         var events = new List<GameEvent>();
-        for (var i = 0; i < config.EnemyFireIntervalTicks + 5; i++)
-            events.AddRange(sim.Tick(NoCommands));
+        for (var i = 0; i < config.ReloadTicks + 5; i++) events.AddRange(sim.Tick(NoCommands));
 
         Assert.Equal(2, events.Count(e => e is EnemyTorpedoFired));
+    }
+
+    [Fact]
+    public void Enemy_KeepsOnlyOneTorpedoInTheWater()
+    {
+        // Aunque la recarga ya haya terminado, mientras su torpedo siga viajando el enemigo
+        // no dispara otro. Con torpedos lentos éste es el límite que manda, no el reloj.
+        var config = TestWorld.Config() with
+        {
+            ReloadTicks = 30,             // recarga casi instantánea
+            EnemyTorpedoSpeed = 0.05,     // pero el torpedo tarda muchísimo en llegar
+        };
+        var sim = TestWorld.Still(config);
+        sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.95), nextFireTick: 0) });
+
+        var events = new List<GameEvent>();
+        for (var i = 0; i < 600; i++) events.AddRange(sim.Tick(NoCommands));
+
+        // 600 ticks son veinte recargas, y sin embargo hay un solo disparo.
+        Assert.Single(events, e => e is EnemyTorpedoFired);
+        Assert.Single(sim.State.Torpedoes, t => t.Side == TorpedoSide.Enemy);
+
+        // Control positivo: con el torpedo fuera del agua sí vuelve a disparar. Sin esto el
+        // test pasaría igual si los enemigos hubieran dejado de disparar del todo.
+        sim.SetTorpedoes(System.Array.Empty<Torpedo>());
+        var after = new List<GameEvent>();
+        for (var i = 0; i < 60; i++) after.AddRange(sim.Tick(NoCommands));
+
+        Assert.Contains(after, e => e is EnemyTorpedoFired);
     }
 
     [Fact]

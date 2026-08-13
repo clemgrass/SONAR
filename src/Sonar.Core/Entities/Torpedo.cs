@@ -25,6 +25,12 @@ public sealed record Torpedo
     public required double ArmedFromRadius { get; init; }
     public required double RunToRadius { get; init; }
 
+    /// <summary>
+    /// Contacto que lo lanzó, o -1 si es propio. Existe para poder responder "¿este enemigo
+    /// ya tiene un torpedo en el agua?", que es lo que le impide disparar otro.
+    /// </summary>
+    public int SourceContactId { get; init; } = -1;
+
     public static Torpedo CreateOwn(TorpedoId id, TargetCoordinate target, BandLayout layout, double speed)
     {
         var direction = target.Bearing.ToUnitVector();
@@ -45,7 +51,8 @@ public sealed record Torpedo
     /// Torpedo enemigo: viaja recto hacia el origen desde donde nació. El submarino está
     /// fijo en el origen, así que no existe la distinción entre dónde está y dónde estará.
     /// </summary>
-    public static Torpedo CreateEnemy(TorpedoId id, Vec2 origin, double speed) => new()
+    public static Torpedo CreateEnemy(
+        TorpedoId id, Vec2 origin, double speed, int sourceContactId = -1) => new()
     {
         Id = id,
         Side = TorpedoSide.Enemy,
@@ -55,5 +62,6 @@ public sealed record Torpedo
         Bearing = new Bearing(0),
         ArmedFromRadius = 0,
         RunToRadius = 0,
+        SourceContactId = sourceContactId,
     };
 }

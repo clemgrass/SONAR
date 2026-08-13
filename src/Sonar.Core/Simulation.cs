@@ -124,9 +124,17 @@ public sealed class Simulation : ISimulation
     // --- Fases. Se llenan en las tareas siguientes de este plan. ---
 
     /// <summary>
-    /// IA mínima de M1: cada enemigo dispara recto hacia el origen a intervalos fijos.
-    /// No evade, no persigue y no elige blanco — el §63.11 completo va a un milestone
-    /// posterior. Lo que M1 mide es al jugador bajo presión, no la inteligencia del enemigo.
+    /// IA mínima de M1: cada enemigo dispara recto hacia el origen. No evade, no persigue y
+    /// no elige blanco — el §63.11 completo va a un milestone posterior. Lo que M1 mide es
+    /// al jugador bajo presión, no la inteligencia del enemigo.
+    ///
+    /// Juega con las mismas reglas de munición que el jugador: <b>un solo torpedo en el agua
+    /// a la vez</b>, y tras disparar tarda `config.ReloadTicks` en recargar — el mismo
+    /// tiempo que cuesta a este lado. Con torpedos lentos, el que manda es el primer límite:
+    /// mientras el suyo siga viajando, ese enemigo no puede volver a disparar.
+    ///
+    /// `EnemyFireIntervalTicks` ya no gobierna la cadencia: sólo lo usa ContactSpawner para
+    /// decidir cuándo un contacto recién aparecido queda armado por primera vez.
     /// </summary>
     private WorldState FireEnemyTorpedoes(
         WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)
@@ -139,17 +147,19 @@ public sealed class Simulation : ISimulation
             if (state.Tick < contact.NextFireTick) continue;
             if (contact.Position.Length > 1.0) continue;
 
+            // Uno a la vez: hasta que el suyo se resuelva —impacte, lo intercepten o salga
+            // del arena— este enemigo no vuelve a disparar.
+            if (torpedoes.Any(t => t.Side == TorpedoSide.Enemy
+                                   && t.SourceContactId == contact.Id.Value)) continue;
+
             var (id, advanced) = state.TakeEntityId();
             state = advanced;
 
-            torpedoes.Add(Torpedo.CreateEnemy(
-                new TorpedoId(id), contact.Position, _config.EnemyTorpedoSpeed));
+            torpedoes.Add(Torpedo.CreateEnemy(new TorpedoId(id), contact.Position,
+                _config.EnemyTorpedoSpeed, contact.Id.Value));
             events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
 
-            contacts[i] = contact with
-            {
-                NextFireTick = state.Tick + _config.EnemyFireIntervalTicks,
-            };
+            contacts[i] = contact with { NextFireTick = state.Tick + _config.ReloadTicks };
         }
 
         return state;
@@ -370,12 +380,17 @@ public sealed class Simulation : ISimulation
     /// La recarga ocurre en tiempo real y no pausa nada (§23 del GDD). No se puede
     /// interrumpir ni cancelar en M1: interrupción y fallo dependen del sistema de daño,
     /// que va a un milestone posterior.
+    ///
+    /// `[DECIDED]` Carga <b>un torpedo por recarga</b>, no llena el cargador. Con tres tubos
+    /// y siete segundos por tubo, quedarse en cero cuesta veintiún segundos de trabajo
+    /// repetido en vez de una sola espera: disparar el tercero es una decisión, no un
+    /// trámite. Es la misma regla que respetan los enemigos (ver FireEnemyTorpedoes).
     /// </summary>
     private PlayerSub AdvanceReload(PlayerSub sub, int tick, List<GameEvent> events)
     {
         if (!sub.ReloadInProgress || tick < sub.ReloadCompletesAtTick) return sub;
 
-        var room = _config.MagazineSize - sub.AmmoLoaded;
+        var room = Math.Min(1, _config.MagazineSize - sub.AmmoLoaded);
         var moved = Math.Min(room, sub.AmmoReserve);
 
         var reloaded = sub with
