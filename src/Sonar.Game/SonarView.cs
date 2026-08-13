@@ -14,8 +14,10 @@ public partial class SonarView : Node2D
 {
     private static readonly Color Grid = new(0.29f, 0.87f, 0.50f, 0.28f);
     private static readonly Color GridStrong = new(0.35f, 0.95f, 0.58f, 0.80f);
+    private static readonly Color Graticule = new(0.29f, 0.87f, 0.50f, 0.14f);
     private static readonly Color DeadZone = new(1.0f, 0.42f, 0.42f, 0.35f);
     private static readonly Color Label = new(0.78f, 1.0f, 0.88f);
+    private static readonly Color MinorLabel = new(0.60f, 0.85f, 0.72f);
     private static readonly Color ContactColor = new(0.36f, 1.0f, 0.61f);
     private static readonly Color OwnTorpedo = new(1.0f, 0.82f, 0.36f);
     private static readonly Color EnemyTorpedo = new(1.0f, 0.36f, 0.36f);
@@ -23,16 +25,24 @@ public partial class SonarView : Node2D
     private static readonly Color SubColor = new(0.95f, 1.0f, 0.97f);
 
     /// <summary>
-    /// Radio del scope en píxeles. Con el centro en (400, 370) del viewport de 1280x800,
-    /// los rótulos de marcación quedan en y≈694 y el campo de comandos arranca en 738:
+    /// Radio del scope en píxeles. Con el centro en (400, 380) del viewport de 1280x800,
+    /// el anillo de rótulos llega hasta y≈690 y el campo de comandos arranca en 736:
     /// crecer este número los hace chocar.
     /// </summary>
-    private const float Radius = 300f;
+    private const float Radius = 290f;
 
-    private const int LabelSize = 15;
+    /// <summary>Marcaciones múltiplo de esto llevan rótulo grande y marca larga.</summary>
+    private const int MajorEvery = 30;
 
-    /// <summary>Ticks de una vuelta completa del haz, para atenuar por edad.</summary>
-    private const float SweepTicks = 210f;
+    /// <summary>Paso de los rótulos de marcación. Cada uno es un número en el anillo.</summary>
+    private const int LabelEvery = 5;
+
+    /// <summary>Paso de las radiales punteadas que ayudan a estimar la marcación a ojo.</summary>
+    private const int GraticuleEvery = 10;
+
+    private const int MajorLabelSize = 18;
+    private const int MinorLabelSize = 10;
+    private const int BandLabelSize = 14;
 
     private WorldSnapshot? _snapshot;
 
@@ -40,14 +50,22 @@ public partial class SonarView : Node2D
     private double[] _bandOuterRadii = { 0.28, 0.46, 0.64, 0.82, 1.00 };
     private double _deadZoneRadius = 0.10;
 
+    /// <summary>
+    /// Ticks de una vuelta completa del haz. Sale de la configuración y no de una constante
+    /// porque es la escala con la que se atenúan las lecturas: fijarla a mano haría que
+    /// cambiar el período del barrido —la pregunta 4 de M1— desincronizara el desvanecido.
+    /// </summary>
+    private float _sweepTicks = 300f;
+
     private Font _font = null!;
 
     public override void _Ready() => _font = ThemeDB.FallbackFont;
 
-    public void SetGeometry(double deadZoneRadius, double[] bandOuterRadii)
+    public void SetGeometry(double deadZoneRadius, double[] bandOuterRadii, double sweepTicks)
     {
         _deadZoneRadius = deadZoneRadius;
         _bandOuterRadii = bandOuterRadii;
+        _sweepTicks = (float)sweepTicks;
     }
 
     public void SetSnapshot(WorldSnapshot snapshot)
@@ -85,11 +103,34 @@ public partial class SonarView : Node2D
         DrawCircle(Vector2.Zero, 6f, SubColor);
     }
 
+    /// <summary>Dibuja un texto centrado en el punto dado, no anclado a su esquina.</summary>
+    private void DrawCenteredString(Vector2 at, string text, int size, Color color)
+    {
+        var width = _font.GetStringSize(text, HorizontalAlignment.Left, -1, size).X;
+        DrawString(_font, at + new Vector2(-width / 2f, _font.GetAscent(size) / 2f),
+            text, HorizontalAlignment.Left, -1, size, color);
+    }
+
     private void DrawGrid()
     {
+        var deadZone = (float)_deadZoneRadius * Radius;
+
         // Zona muerta: dentro de este radio ningún torpedo propio está armado. Se dibuja
         // porque explica visualmente por qué un disparo a quemarropa no hace nada.
-        DrawArc(Vector2.Zero, (float)_deadZoneRadius * Radius, 0, Mathf.Tau, 48, DeadZone, 2f);
+        DrawArc(Vector2.Zero, deadZone, 0, Mathf.Tau, 48, DeadZone, 2f);
+
+        // Radiales punteadas muy finas. No son decoración: sin ellas hay que estimar la
+        // marcación de un punto a ojo entre rótulos separados 30 grados, y el juego pide
+        // escribir la coordenada exacta.
+        //
+        // Arrancan en el borde de la primera banda y no en la zona muerta: hacia el centro
+        // convergen tanto que dejan de servir para leer una marcación y sólo ensucian.
+        var graticuleFrom = (float)_bandOuterRadii[0] * Radius;
+        for (var d = 0; d < 360; d += GraticuleEvery)
+        {
+            var dir = BearingToDirection(d);
+            DrawDashedLine(dir * graticuleFrom, dir * Radius, Graticule, 1f, 5f);
+        }
 
         for (var i = 0; i < _bandOuterRadii.Length; i++)
         {
@@ -98,18 +139,25 @@ public partial class SonarView : Node2D
             DrawArc(Vector2.Zero, outer, 0, Mathf.Tau, 96, last ? GridStrong : Grid, last ? 2.5f : 1.5f);
 
             // Letra de la banda, sobre el eje este, en el centro de la banda.
-            var inner = i == 0 ? (float)_deadZoneRadius * Radius : (float)_bandOuterRadii[i - 1] * Radius;
-            DrawString(_font, new Vector2((inner + outer) / 2f - 5f, -6f),
-                ((char)('A' + i)).ToString(), HorizontalAlignment.Left, -1, LabelSize,
-                new Color(Label, 0.45f));
+            var inner = i == 0 ? deadZone : (float)_bandOuterRadii[i - 1] * Radius;
+            DrawCenteredString(new Vector2((inner + outer) / 2f, 0f),
+                ((char)('A' + i)).ToString(), BandLabelSize, new Color(Label, 0.50f));
         }
 
-        for (var d = 0; d < 360; d += 30)
+        // Rótulos de marcación cada LabelEvery grados. Los múltiplos de MajorEvery van más
+        // grandes y con marca más larga: la jerarquía de tamaño es lo que deja leer una
+        // marcación de un vistazo sin contar rayitas.
+        for (var d = 0; d < 360; d += LabelEvery)
         {
             var dir = BearingToDirection(d);
-            DrawLine(dir * (Radius - 16), dir * Radius, GridStrong, 2f);
-            DrawString(_font, dir * (Radius + 24) + new Vector2(-14, 5), d.ToString("D3"),
-                HorizontalAlignment.Center, -1, LabelSize, Label);
+            var major = d % MajorEvery == 0;
+
+            DrawLine(dir * (Radius - (major ? 15 : 7)), dir * Radius,
+                major ? GridStrong : Grid, major ? 2f : 1f);
+
+            DrawCenteredString(dir * (Radius + (major ? 22 : 13)), d.ToString("D3"),
+                major ? MajorLabelSize : MinorLabelSize,
+                major ? Label : MinorLabel);
         }
     }
 
@@ -123,15 +171,14 @@ public partial class SonarView : Node2D
     {
         // Posición de la LECTURA, no la real. Atenuada por edad: cuanto más vieja la
         // lectura, menos confiable la extrapolación. Es el juego entero.
+        //
+        // Sin rótulo de coordenada a propósito. Ponerle "C047" al punto le entrega hecha
+        // justamente la lectura que M1 está midiendo si es satisfactorio hacer: el jugador
+        // saca la marcación del anillo y la banda de los anillos, y la escribe él.
         foreach (var contact in snap.Contacts)
         {
-            var freshness = Mathf.Clamp(1f - contact.AgeTicks / SweepTicks, 0.22f, 1f);
-            var position = ToScreen(contact.Position);
-
-            DrawCircle(position, 7f, new Color(ContactColor, freshness));
-            DrawString(_font, position + new Vector2(-26, -14),
-                $"{contact.BandLetter}{contact.BearingDegrees:D3}",
-                HorizontalAlignment.Left, -1, LabelSize, new Color(Label, freshness));
+            var freshness = Mathf.Clamp(1f - contact.AgeTicks / _sweepTicks, 0.22f, 1f);
+            DrawCircle(ToScreen(contact.Position), 7f, new Color(ContactColor, freshness));
         }
     }
 

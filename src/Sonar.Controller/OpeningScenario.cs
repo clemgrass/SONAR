@@ -20,7 +20,7 @@ public static class OpeningScenario
     /// La deriva se suma a la velocidad de todos los contactos, así que este número fija
     /// cuánto dura un encuentro.
     /// </summary>
-    public const double SubSpeed = 0.02;
+    public const double SubSpeed = 0.012;
 
     public static readonly Bearing Course = new(0);
 
@@ -35,7 +35,7 @@ public static class OpeningScenario
     /// M1 mide si extrapolar lecturas es satisfactorio, y para eso hace falta alcanzar a
     /// leer, extrapolar, disparar y ver el resultado. La presión viene después.
     /// </summary>
-    public const int FirstFireGraceTicks = 900;
+    public const int FirstFireGraceTicks = 1800;
 
     /// <summary>
     /// Cuatro enemigos y un pecio. Las velocidades propias casi cancelan la deriva: el neto
@@ -61,10 +61,10 @@ public static class OpeningScenario
             },
             velocities: new[]
             {
-                new Vec2(0.0015, -0.018),
-                new Vec2(-0.0030, -0.020),
-                new Vec2(0.0020, -0.022),
-                new Vec2(0.0008, -0.019),
+                new Vec2(0.0008, -0.0110),
+                new Vec2(-0.0016, -0.0120),
+                new Vec2(0.0011, -0.0132),
+                new Vec2(0.0004, -0.0114),
             });
 
         foreach (var enemy in enemies)

@@ -37,7 +37,8 @@ public partial class Main : Node
         _hud = GetNode<Label>("%Hud");
 
         var config = LoadConfig();
-        _sonar.SetGeometry(config.DeadZoneRadius, config.BandOuterRadii.ToArray());
+        _sonar.SetGeometry(config.DeadZoneRadius, config.BandOuterRadii.ToArray(),
+            config.SweepPeriodSeconds / config.TickDurationSeconds);
 
         _controller = new GameController(
             config, Seed, OpeningScenario.Course, OpeningScenario.SubSpeed);

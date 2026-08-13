@@ -135,11 +135,17 @@ Corolarios para el dibujo:
 
 - Un contacto que el haz todavía no barrió **no aparece en la lista**. No es que esté en
   posición cero: no está.
-- `AgeTicks` sirve para atenuar la etiqueta con la edad. A 60 ticks por segundo y un barrido
-  de 3,5 s, una vuelta son ~210 ticks: esa es la escala natural para la atenuación.
+- `AgeTicks` sirve para atenuar la marca con la edad. La escala natural es una vuelta del
+  haz: `SweepPeriodSeconds / TickDurationSeconds`. Sácala de la configuración y no la fijes
+  a mano, o cambiar el período del barrido —la pregunta 4 de M1— desincroniza el desvanecido.
 - No dibujes una traza con las posiciones sucesivas. Mostrarla convertiría la extrapolación
   en lectura pasiva y vaciaría la habilidad central (TDD §5.2). El cuaderno del jugador es
   de papel.
+- **No le pongas la coordenada al punto.** Escribir `C047` al lado del contacto le entrega
+  hecha justamente la lectura que M1 mide si es satisfactorio hacer. El jugador saca la
+  marcación del anillo graduado y la banda de los anillos concéntricos. Por eso el anillo
+  lleva números cada 5 grados y radiales punteadas cada 10: son la herramienta de lectura,
+  no adorno.
 
 ### El resto: posición real, cada frame
 

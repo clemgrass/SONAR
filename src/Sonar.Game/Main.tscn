@@ -22,7 +22,7 @@ color = Color(0.0352941, 0.121569, 0.0745098, 1)
 
 [node name="SonarView" type="Node2D" parent="."]
 unique_name_in_owner = true
-position = Vector2(400, 370)
+position = Vector2(400, 380)
 script = ExtResource("2_sonar")
 
 [node name="Hud" type="Label" parent="."]
