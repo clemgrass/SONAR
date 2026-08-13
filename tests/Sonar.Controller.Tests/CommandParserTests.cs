@@ -75,6 +75,18 @@ public class CommandParserTests
     [InlineData("   ")]
     public void EmptyInput_ReturnsNull(string input) => Assert.Null(Parser.Parse(input));
 
+    [Theory]
+    [InlineData("RETRY")]
+    [InlineData("retry")]
+    [InlineData("  Retry  ")]
+    public void ParsesRetry(string input) => Assert.IsType<RetryCommand>(Parser.Parse(input));
+
+    [Theory]
+    [InlineData("START")]
+    [InlineData("start")]
+    [InlineData("  Start  ")]
+    public void ParsesStart(string input) => Assert.IsType<StartCommand>(Parser.Parse(input));
+
     [Fact]
     public void BandCountIsRespected()
     {

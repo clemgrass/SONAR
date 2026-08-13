@@ -37,6 +37,8 @@ public sealed class CommandParser
             case "RELOAD": return new ReloadCommand();
             case "SONAR": return new ToggleSonarCommand();
             case "STATUS": return new StatusCommand();
+            case "RETRY": return new RetryCommand();
+            case "START": return new StartCommand();
         }
 
         var defense = DefensePattern.Match(normalized);

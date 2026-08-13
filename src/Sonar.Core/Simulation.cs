@@ -40,6 +40,10 @@ public sealed class Simulation : ISimulation
     /// <summary>Solo para tests y para el guion de misión: coloca contactos de golpe.</summary>
     public void SetContacts(IEnumerable<Contact> contacts) => State = State.WithContacts(contacts);
 
+    /// <summary>Suma contactos a los que ya están. Lo usa el director de oleadas.</summary>
+    public void AddContacts(IEnumerable<Contact> contacts) =>
+        State = State.WithContacts(State.Contacts.Concat(contacts));
+
     public void SetTorpedoes(IEnumerable<Torpedo> torpedoes) => State = State.WithTorpedoes(torpedoes);
 
     public void SetDefenses(IEnumerable<Defense> defenses) => State = State.WithDefenses(defenses);
