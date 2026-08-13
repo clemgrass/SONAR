@@ -66,4 +66,34 @@ public class BearingTests
     {
         Assert.Equal(0, Bearing.FromVector(Vec2.Zero).Degrees);
     }
+
+    [Fact]
+    public void DegreesOf_KeepsFractionsThatFromVectorRoundsAway()
+    {
+        // Un contacto a 0.5 grados al este del norte. FromVector devolvería 000 o 001;
+        // para medir error de puntería hace falta el valor sin redondear.
+        var v = new Vec2(System.Math.Sin(0.5 * System.Math.PI / 180.0),
+                        -System.Math.Cos(0.5 * System.Math.PI / 180.0));
+
+        Assert.Equal(0.5, Bearing.DegreesOf(v), precision: 6);
+    }
+
+    [Fact]
+    public void DegreesOf_IsAlwaysInRange()
+    {
+        Assert.Equal(90.0, Bearing.DegreesOf(new Vec2(1, 0)), precision: 6);
+        Assert.Equal(180.0, Bearing.DegreesOf(new Vec2(0, 1)), precision: 6);
+        Assert.Equal(270.0, Bearing.DegreesOf(new Vec2(-1, 0)), precision: 6);
+        Assert.Equal(0.0, Bearing.DegreesOf(new Vec2(0, -1)), precision: 6);
+        Assert.Equal(0.0, Bearing.DegreesOf(Vec2.Zero), precision: 6);
+    }
+
+    [Fact]
+    public void Separation_TakesTheShortWayAround()
+    {
+        Assert.Equal(10.0, Bearing.Separation(5.0, 355.0), precision: 6);
+        Assert.Equal(10.0, Bearing.Separation(355.0, 5.0), precision: 6);
+        Assert.Equal(180.0, Bearing.Separation(0.0, 180.0), precision: 6);
+        Assert.Equal(0.0, Bearing.Separation(47.0, 47.0), precision: 6);
+    }
 }
