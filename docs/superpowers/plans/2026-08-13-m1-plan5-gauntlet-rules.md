@@ -955,7 +955,9 @@ public class WaveDirectorTests
         for (var tick = 0; tick < WaveDirector.OpeningQuietTicks; tick++)
             Assert.Empty(director.Advance(tick, liveEnemies: 0));
 
-        Assert.Empty(director.Advance(WaveDirector.OpeningQuietTicks, liveEnemies: 0));
+        // En este tick termina el silencio y la oleada 1 se genera: el llamado devuelve un
+        // contacto, no vacío.
+        Assert.Single(director.Advance(WaveDirector.OpeningQuietTicks, liveEnemies: 0));
         Assert.Equal(1, director.Wave);
     }
 
@@ -1114,6 +1116,13 @@ public sealed class WaveDirector
     /// <summary>Primer id de contacto. Deja libre el rango bajo para escenarios de test.</summary>
     private const int FirstContactId = 100;
 
+    /// <summary>
+    /// Tope de tamaño de oleada. En una partida real nunca se alcanza —el jugador muere
+    /// mucho antes—, pero un arnés que limpia el tablero al instante sí llega, y sin tope
+    /// agota la memoria.
+    /// </summary>
+    private const int MaxWaveSize = 512;
+
     // Velocidad de cierre NETA deseada, ya descontada la deriva del mundo. La oleada 1 casi
     // no se mueve para que un jugador lento igual alcance a disparar.
     private const double ClosingBase = 0.006;
@@ -1154,7 +1163,13 @@ public sealed class WaveDirector
 
         Wave++;
         _waitingForClear = true;
-        return Spawn(1 << (Wave - 1));
+
+        // Exponente acotado antes de desplazar y tamaño acotado después. Sin lo primero, a
+        // partir de la oleada 32 el corrimiento de un int se envuelve; sin lo segundo, un
+        // arnés que limpia el tablero al instante llega a oleadas absurdas y agota la
+        // memoria. Se confirmó empíricamente: varios GB antes de la oleada 30.
+        var exponent = Math.Min(Wave - 1, 30);
+        return Spawn(Math.Min(1 << exponent, MaxWaveSize));
     }
 
     private IReadOnlyList<Contact> Spawn(int count)
