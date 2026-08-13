@@ -826,6 +826,12 @@ Y agrega a `tests/Sonar.Controller.Tests/CommandParserTests.cs`, dentro de la cl
     [InlineData("retry")]
     [InlineData("  Retry  ")]
     public void ParsesRetry(string input) => Assert.IsType<RetryCommand>(Parser.Parse(input));
+
+    [Theory]
+    [InlineData("START")]
+    [InlineData("start")]
+    [InlineData("  Start  ")]
+    public void ParsesStart(string input) => Assert.IsType<StartCommand>(Parser.Parse(input));
 ```
 
 - [ ] **Step 2: Correr para verificar que falla**
@@ -852,12 +858,20 @@ En `src/Sonar.Core/Commands/Command.cs`, junto a los otros comandos:
 /// porque con el submarino destruido el bucle se congela y nunca lo consumiría.
 /// </summary>
 public sealed record RetryCommand : Command;
+
+/// <summary>
+/// Arranca la corrida. Hasta que llegue, el mundo está detenido: la demo tiene que poder
+/// explicarse sola a alguien que la abre sin nadie al lado, y eso exige un momento sin reloj
+/// corriendo en el que leer las instrucciones.
+/// </summary>
+public sealed record StartCommand : Command;
 ```
 
 En `src/Sonar.Controller/CommandParser.cs`, agrega al `switch (normalized)`:
 
 ```csharp
             case "RETRY": return new RetryCommand();
+            case "START": return new StartCommand();
 ```
 
 - [ ] **Step 4: Correr para verificar que pasan**
@@ -1234,11 +1248,62 @@ Agrega al final de la clase `GameControllerTests`:
     }
 
     [Fact]
+    public void NothingRunsBeforeStart()
+    {
+        // La demo tiene que poder explicarse sola. Sin un momento con el reloj detenido, el
+        // jugador nuevo lee las instrucciones mientras lo matan.
+        var config = Config();
+        var controller = New();
+
+        for (var i = 0; i < 3000; i++)
+        {
+            Assert.Empty(controller.Advance(config.TickDurationSeconds));
+        }
+
+        Assert.False(controller.Started);
+        Assert.Equal(0, controller.Snapshot.Tick);
+        Assert.Equal(0, controller.Wave);
+    }
+
+    [Fact]
+    public void Start_SetsTheWorldRunning()
+    {
+        var config = Config();
+        var controller = New();
+
+        Assert.True(controller.SubmitInput("START"));
+        Assert.True(controller.Started);
+
+        for (var i = 0; i < 60; i++) controller.Advance(config.TickDurationSeconds);
+        Assert.Equal(60, controller.Snapshot.Tick);
+    }
+
+    [Fact]
+    public void Retry_DoesNotSendYouBackToTheBriefing()
+    {
+        // Volver a leer el instructivo en cada muerte es tedio, no enseñanza.
+        var config = Config();
+        var controller = New();
+        controller.SubmitInput("START");
+        for (var i = 0; i < 60; i++) controller.Advance(config.TickDurationSeconds);
+
+        controller.ForceDestroyForTests();
+        controller.SubmitInput("RETRY");
+
+        Assert.True(controller.Started);
+        Assert.Equal(0, controller.Snapshot.Tick);
+
+        controller.Advance(config.TickDurationSeconds);
+        Assert.Equal(1, controller.Snapshot.Tick);
+    }
+
+    [Fact]
     public void SubmitInput_ReportsWhetherItUnderstood()
     {
         // La telemetría necesita saberlo y la escena no puede deducirlo: el parser vive
         // dentro del controller.
         var controller = New();
+        controller.SubmitInput("START");
 
         Assert.True(controller.SubmitInput("C047"));
         Assert.False(controller.SubmitInput("hello"));
@@ -1356,6 +1421,13 @@ public sealed class GameController
     /// <summary>Semilla del intento actual. Anotarla permite reproducirlo entero.</summary>
     public int Seed { get; private set; }
 
+    /// <summary>
+    /// Falso hasta que llegue `START`. Con el mundo detenido el jugador nuevo puede leer las
+    /// instrucciones sin que lo maten mientras lee: es lo que permite que la demo se explique
+    /// sola. Una vez arrancada no vuelve atrás — `RETRY` reinicia la corrida, no el instructivo.
+    /// </summary>
+    public bool Started { get; private set; }
+
     public int Wave => _waves.Wave;
 
     public int LiveEnemyCount =>
@@ -1412,10 +1484,21 @@ public sealed class GameController
         var command = _parser.Parse(rawText);
         if (command is null) return false;
 
-        if (command is RetryCommand)
+        switch (command)
         {
-            if (Snapshot.Destroyed) StartRun();
-            return true;
+            case StartCommand:
+                Started = true;
+                return true;
+
+            case RetryCommand:
+                if (Snapshot.Destroyed) StartRun();
+                return true;
+
+            // Antes de arrancar sólo START hace algo. Un comando encolado durante el
+            // instructivo se dispararía en el instante en que el jugador arranca, que es
+            // justo cuando todavía no sabe lo que hace.
+            case not null when !Started:
+                return command is not UnrecognizedInput;
         }
 
         _pending.Add(command);
@@ -1429,6 +1512,10 @@ public sealed class GameController
     /// </summary>
     public IReadOnlyList<GameEvent> Advance(double deltaSeconds)
     {
+        // El mundo no corre hasta START. Tampoco se acumula tiempo: si se acumulara, el
+        // jugador que se toma dos minutos leyendo recibiría una avalancha al arrancar.
+        if (!Started) return Array.Empty<GameEvent>();
+
         _accumulator += deltaSeconds;
 
         var events = new List<GameEvent>();
@@ -1879,7 +1966,17 @@ En `docs/development/godot-wiring.md`, en la tabla del §6:
 Y en la tabla de comandos del §8:
 
 ```markdown
+| `START` | Arranca la corrida. Antes de esto el mundo está detenido |
 | `RETRY` | Reinicia desde cero. Sólo con el submarino destruido |
+```
+
+Debajo de esa tabla:
+
+```markdown
+**El mundo no corre hasta `START`.** No es un detalle de flujo: la demo tiene que poder
+abrirse sin nadie al lado que la explique, y eso exige un momento con el reloj detenido en el
+que leer las instrucciones. `RETRY` reinicia la corrida pero **no** devuelve al instructivo —
+releerlo en cada muerte es tedio, no enseñanza.
 ```
 
 - [ ] **Step 4: Estado del proyecto**

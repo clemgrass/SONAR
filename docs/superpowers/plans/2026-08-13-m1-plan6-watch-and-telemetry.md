@@ -136,6 +136,9 @@ Expected: `Build succeeded. 0 Warning(s)` y `[SELFTEST] PASA`.
 
 > El selftest dispara a los ~2 s y el primer contacto entra a los 10 s, así que
 > `ShotAssessed` no se emitirá y `shots=1` seguirá viniendo de `TorpedoFired`. Sigue pasando.
+>
+> A partir de la tarea 2 el guion del arnés necesita escribir `START` primero, o nada corre.
+> Ese cambio vive en la tarea 10.
 
 - [ ] **Step 4: Commit**
 
@@ -146,10 +149,11 @@ git commit -m "feat(game): drive the gauntlet and show a mission clock"
 
 ---
 
-## Task 2: Historial con ritmo
+## Task 2: Historial con ritmo e instructivo
 
 **Files:**
 - Create: `src/Sonar.Game/EventLog.cs`
+- Create: `src/Sonar.Game/Briefing.cs`
 - Modify: `src/Sonar.Game/Main.cs`
 
 - [ ] **Step 1: Escribir el componente**
@@ -192,9 +196,14 @@ public sealed class EventLog
     public void Queue(string color, string content) => _queue.Enqueue(Format(color, content));
 
     /// <summary>
-    /// Salta la cola y escribe de inmediato. Reservado para lo que el §4.6 del spec declara
-    /// ley del mundo: la confirmación de impacto no depende de nada. El resto del registro
-    /// puede llegar tarde; que te peguen, no.
+    /// Salta la cola y escribe de inmediato. Dos usos, por razones distintas:
+    ///
+    /// El impacto sobre el propio submarino, porque el §4.6 del spec lo declara ley del
+    /// mundo — el resto del registro puede llegar tarde; que te peguen, no.
+    ///
+    /// Y el instructivo, porque es texto de referencia para leer al propio paso, no una
+    /// secuencia con ritmo. Encolarlo lo haría desfilar delante de alguien que sólo quiere
+    /// leerlo entero.
     /// </summary>
     public void WriteNow(string color, string content) => Emit(Format(color, content));
 
@@ -245,16 +254,13 @@ método `Append` completo y reemplaza el cuerpo de `Instrument` por:
     private void Instrument(string text) => _eventLog.Queue(Dim, $"  {text}");
 ```
 
-Y actualiza los tres sitios que llamaban a `Append`:
-
-```csharp
-        _eventLog.Queue(Dim, "SONAR M1 — VALIDATION PROTOTYPE");
-        _eventLog.Queue(Dim, "TYPE C047 AND PRESS ENTER · RELOAD · SONAR · STATUS · DEF C047");
-```
+Y el eco del comando:
 
 ```csharp
         _eventLog.Queue(Typed, $"> {command}");
 ```
+
+Las dos líneas de bienvenida las reemplaza el instructivo del paso 4.
 
 En `_Process`, después de procesar los eventos:
 
@@ -275,33 +281,124 @@ En `Report`, cambia los dos casos que informan daño al submarino:
                 break;
 ```
 
-- [ ] **Step 4: Verificar**
+- [ ] **Step 4: El instructivo**
+
+La demo tiene que poder abrirse sin nadie al lado que la explique. Crea
+`src/Sonar.Game/Briefing.cs`:
+
+```csharp
+namespace Sonar.Game;
+
+/// <summary>
+/// Lo que el jugador lee antes de escribir START, con el mundo detenido.
+///
+/// Está en un archivo aparte porque es **contenido**, no cableado: se va a reescribir muchas
+/// veces mirando cómo se traba la gente, y no conviene tener que abrir Main.cs para eso.
+///
+/// En inglés, como todo lo que ve el jugador. Sale de golpe y sin ritmo: es texto de
+/// referencia para leer al propio paso, no una secuencia con dramaturgia.
+/// </summary>
+public static class Briefing
+{
+    public static readonly string[] Lines =
+    {
+        "SONAR M1 — VALIDATION PROTOTYPE",
+        "",
+        "YOU ARE THE SONAR OPERATOR. YOU NEVER SEE THE SEA.",
+        "ALL YOU SEE IS WHAT THE BEAM LAST SWEPT.",
+        "",
+        "READING THE SCOPE",
+        "  THE LINE TURNING AROUND THE CIRCLE IS THE BEAM.",
+        "  A MARK IS WHERE A CONTACT WAS WHEN THE BEAM LAST CROSSED IT.",
+        "  NOT WHERE IT IS NOW. IT HAS MOVED SINCE.",
+        "  MARKS FADE AS THEY AGE. A FAINT MARK IS AN OLD ONE.",
+        "  THE OUTER RING IS GRADUATED IN DEGREES.",
+        "  THE INNER CIRCLES ARE RANGE BANDS, A THROUGH E.",
+        "  NOTHING IS LABELLED. YOU READ THE BEARING AND THE BAND YOURSELF.",
+        "",
+        "FIRING",
+        "  TYPE A BAND LETTER AND THREE DIGITS OF BEARING, LIKE C047.",
+        "  THE TORPEDO RUNS ALONG THAT BEARING AND DETONATES AT THAT BAND.",
+        "  IT DESTROYS THE FIRST THING IT CROSSES ON THE WAY.",
+        "  IT TAKES SECONDS TO ARRIVE. AIM WHERE THE CONTACT WILL BE.",
+        "",
+        "COMMANDS",
+        "  C047      FIRE ON BEARING 047, BAND C",
+        "  DEF C047  DROP A DEFENCE THERE. ONE AT A TIME, SPENT WHEN IT GOES OFF",
+        "  RELOAD    LOAD ONE TORPEDO. THREE TUBES. THE WORLD KEEPS RUNNING",
+        "  SONAR     STOP OR RESTART THE BEAM",
+        "  STATUS    REPORT AMMUNITION AND DEFENCES",
+        "  RETRY     START OVER, ONCE YOU ARE DEAD",
+        "",
+        "STAYING ALIVE",
+        "  TWO TORPEDO HITS AND YOU ARE GONE.",
+        "  A CONTACT THAT REACHES YOU KILLS YOU OUTRIGHT. DO NOT LET THEM CLOSE.",
+        "",
+        "THE DEMO",
+        "  CONTACTS COME IN WAVES: ONE, THEN TWO, THEN FOUR, THEN EIGHT.",
+        "  A WAVE ONLY ARRIVES ONCE THE LAST ONE IS GONE.",
+        "  IT IS NOT MEANT TO BE WON. HOW FAR YOU GET IS THE MEASUREMENT.",
+        "",
+        "TYPE START WHEN YOU ARE READY.",
+    };
+}
+```
+
+En `Main._Ready`, reemplaza las dos líneas de bienvenida por:
+
+```csharp
+        // Sin ritmo y de golpe: es texto de referencia, y encolarlo lo haría desfilar
+        // durante diez segundos delante de alguien que sólo quiere leerlo entero.
+        foreach (var line in Briefing.Lines) _eventLog.WriteNow(Dim, line);
+```
+
+- [ ] **Step 5: Anunciar el arranque**
+
+En `Report`, para que el jugador vea que el mundo empezó a correr, agrega al final de
+`OnCommandSubmitted` —después de `_controller.SubmitInput`—:
+
+```csharp
+        if (_controller.Started && !_announcedStart)
+        {
+            _announcedStart = true;
+            _eventLog.Queue(Dim, "  BEAM RUNNING · GOOD HUNTING");
+        }
+```
+
+Con el campo:
+
+```csharp
+    private bool _announcedStart;
+```
+
+- [ ] **Step 6: Verificar**
 
 ```bash
 dotnet build src/Sonar.Game/Sonar.Game.csproj
-godot-mono --path src/Sonar.Game -- --m1-selftest
+godot-mono --path src/Sonar.Game
 ```
 
-Expected: build limpio y `[SELFTEST] PASA`.
+Con la ventana abierta: el instructivo tiene que estar **entero** desde el primer frame, el
+reloj en `00:00`, y nada moviéndose. Escribe `START` y recién ahí el haz empieza a girar.
+Cierra.
 
-> El selftest comprueba `status=True`, que depende de que `StatusReported` llegue a `Report`.
-> Como el registro ahora es asíncrono pero `Report` no, sigue funcionando. Si empieza a
-> fallar, el bug está en `Report`, no en la cola.
+> El selftest todavía va a fallar: su guion no escribe `START`, así que nada corre. Se arregla
+> en la tarea 10, que es donde vive el guion.
 
-- [ ] **Step 5: Mirarlo con ojos**
+- [ ] **Step 7: Mirarlo con ojos**
 
 ```bash
 godot-mono --path src/Sonar.Game
 ```
 
-Escribe `STATUS` varias veces seguidas. Las respuestas tienen que aparecer **de a una**, no
-todas juntas. Cierra la ventana.
+Escribe `START` y después `STATUS` varias veces seguidas. Las respuestas tienen que aparecer
+**de a una**, no todas juntas. Cierra la ventana.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/Sonar.Game
-git commit -m "feat(game): pace the log so it can actually be read"
+git commit -m "feat(game): pace the log and brief the player before START"
 ```
 
 ---
@@ -1155,20 +1252,24 @@ git commit -m "docs: measure the M1 questions against the JSONL log"
 En `Main.cs`, cambia el guion del selftest para que también ejercite el reinicio:
 
 ```csharp
-    private const string SelfTestScript = "c047\nstatus\nretry\n";
+    private const string SelfTestScript = "start\nc047\nstatus\nretry\n";
 ```
 
 Y en `ReportSelfTest`, agrega la comprobación:
 
 ```csharp
-        var ok = _metrics.Commands == 3 && _metrics.ShotsFired == 1 && _sawStatus
-                 && _controller.Attempt == 1;   // RETRY vivo no debe reiniciar nada
+        var ok = _metrics.Commands == 4 && _metrics.ShotsFired == 1 && _sawStatus
+                 && _controller.Started && _controller.Attempt == 1;
 ```
 
 > Con el submarino vivo, `RETRY` se ignora. Que el intento siga en 1 es exactamente lo que
 > hay que fijar: un reinicio accidental a mitad de partida sería peor que no tener RETRY.
 
-Ajusta el mensaje impreso para que muestre `commands=…/3` y `attempt=…`.
+Ajusta el mensaje impreso para que muestre `commands=…/4`, `started=…` y `attempt=…`.
+
+> Cuatro comandos: `START`, el disparo, `STATUS` y el `RETRY` que debe ser ignorado.
+> Que `Started` siga en `true` y `Attempt` en 1 es lo que fija que RETRY con el submarino
+> vivo no reinicie nada ni devuelva al instructivo.
 
 - [ ] **Step 2: Correrlo seis veces**
 
