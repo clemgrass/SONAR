@@ -13,10 +13,14 @@ public sealed record SonarState
     /// <summary>Lecturas vigentes, siempre ordenadas por ContactId ascendente.</summary>
     public required IReadOnlyList<Reading> Readings { get; init; }
 
+    /// <summary>Vueltas completas del haz desde el arranque.</summary>
+    public required int Revolution { get; init; }
+
     public static SonarState CreateInitial() => new()
     {
         SweepDegrees = 0,
         SweepRunning = true,
         Readings = Array.Empty<Reading>(),
+        Revolution = 0,
     };
 }

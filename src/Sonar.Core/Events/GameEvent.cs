@@ -10,6 +10,13 @@ public sealed record StatusReported(int Tick, int AmmoLoaded, int AmmoReserve, i
     : GameEvent(Tick);
 public sealed record InputNotRecognized(int Tick, string RawText) : GameEvent(Tick);
 
+/// <summary>
+/// El haz completó una vuelta. No cambia ningún estado ni habilita ninguna acción: es un
+/// latido, para que el silencio tenga una unidad contable y "hace dos barridos" sea una
+/// frase que el jugador pueda pensar.
+/// </summary>
+public sealed record SweepCompleted(int Tick, int Revolution, int ReadingCount) : GameEvent(Tick);
+
 // --- Combate propio ---
 public sealed record TorpedoFired(int Tick, int TorpedoId, int BearingDegrees, char BandLetter)
     : GameEvent(Tick);

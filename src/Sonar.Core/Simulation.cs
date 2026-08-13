@@ -101,7 +101,7 @@ public sealed class Simulation : ISimulation
         sub = ResolveSubHits(sub, torpedoes, events, state.Tick);
 
         // 10 · Barrido y registro de lecturas
-        var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt);
+        var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
         // 11 · Recarga
         sub = AdvanceReload(sub, state.Tick, events);
@@ -505,7 +505,8 @@ public sealed class Simulation : ISimulation
     /// central que M1 está validando (TDD §5.2).
     /// </summary>
     private Sensing.SonarState AdvanceSweepAndRecord(
-        Sensing.SonarState sonar, List<Contact> contacts, int tick, double dt)
+        Sensing.SonarState sonar, List<Contact> contacts, int tick, double dt,
+        List<GameEvent> events)
     {
         var readings = sonar.Readings.ToList();
 
@@ -535,10 +536,18 @@ public sealed class Simulation : ISimulation
             });
         }
 
+        // El haz cruzó el cero: se completó una vuelta.
+        var revolution = sonar.Revolution + (current < previous ? 1 : 0);
+        var ordered = readings.OrderBy(r => r.ContactId.Value).ToArray();
+
+        if (revolution != sonar.Revolution)
+            events.Add(new SweepCompleted(tick, revolution, ordered.Length));
+
         return sonar with
         {
             SweepDegrees = current,
-            Readings = readings.OrderBy(r => r.ContactId.Value).ToArray(),
+            Revolution = revolution,
+            Readings = ordered,
         };
     }
 }
