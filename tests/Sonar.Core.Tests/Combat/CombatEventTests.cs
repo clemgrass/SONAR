@@ -32,7 +32,7 @@ public class CombatEventTests
     public void SubDestroyed_IsDistinctFromSubHit()
     {
         GameEvent hit = new SubHit(20, 1);
-        GameEvent dead = new SubDestroyed(30);
+        GameEvent dead = new SubDestroyed(30, SubDeathCause.Torpedoes);
         Assert.IsType<SubHit>(hit);
         Assert.IsType<SubDestroyed>(dead);
     }

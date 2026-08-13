@@ -95,7 +95,11 @@ public class SimulationTickTests
             {
                 Id = new ContactId(1),
                 Kind = ContactKind.Enemy,
-                Position = new Vec2(0.5, 0.0),
+                // Y=0.1 en vez de 0: a Y=0 la trayectoria cruza el radio de colisión del
+                // submarino (0.045) y la muerte por embestida congela la simulación antes
+                // de los 60 ticks. Con este desvío el contacto pasa de largo y el test mide
+                // lo que dice medir: movimiento por velocidad propia, no combate.
+                Position = new Vec2(0.5, 0.1),
                 Velocity = new Vec2(-0.6, 0.0),   // acercándose al oeste
                 Alive = true,
                 NextFireTick = int.MaxValue,

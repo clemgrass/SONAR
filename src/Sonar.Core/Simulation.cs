@@ -100,6 +100,10 @@ public sealed class Simulation : ISimulation
         // 9 · Impactos sobre el submarino
         sub = ResolveSubHits(sub, torpedoes, events, state.Tick);
 
+        // 9b · Embestidas. Va después de los torpedos para que, si en el mismo tick te
+        //      llegan las dos cosas, la causa reportada sea la que ya te había matado.
+        sub = ResolveContactCollisions(sub, contacts, events, state.Tick);
+
         // 10 · Barrido y registro de lecturas
         var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
@@ -369,8 +373,32 @@ public sealed class Simulation : ISimulation
             if (sub.HitsTaken >= 2 && !sub.Destroyed)
             {
                 sub = sub with { Destroyed = true };
-                events.Add(new SubDestroyed(tick));
+                events.Add(new SubDestroyed(tick, SubDeathCause.Torpedoes));
             }
+        }
+
+        return sub;
+    }
+
+    /// <summary>
+    /// Un contacto enemigo que llegue encima del submarino lo destruye de una, sin importar
+    /// los impactos previos. Es lo que convierte "no disparar" en una consecuencia.
+    ///
+    /// Los contactos inertes no chocan: un pecio ya está hundido, y morir contra terreno es
+    /// una muerte barata. Misma lógica que su exención frente a las defensas (§4.4).
+    /// </summary>
+    private PlayerSub ResolveContactCollisions(
+        PlayerSub sub, List<Contact> contacts, List<GameEvent> events, int tick)
+    {
+        if (sub.Destroyed) return sub;
+
+        foreach (var contact in contacts)
+        {
+            if (!contact.Alive || contact.Kind != ContactKind.Enemy) continue;
+            if (contact.Position.Length >= _config.SubHitRadius) continue;
+
+            events.Add(new SubDestroyed(tick, SubDeathCause.Collision));
+            return sub with { Destroyed = true };
         }
 
         return sub;

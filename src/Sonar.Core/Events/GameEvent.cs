@@ -54,7 +54,13 @@ public sealed record EnemyTorpedoFired(int Tick, int TorpedoId, int SourceContac
 public sealed record EnemyTorpedoDestroyed(int Tick, int TorpedoId, Vec2 Position,
     DestructionCause Cause) : GameEvent(Tick);
 public sealed record SubHit(int Tick, int HitsTaken) : GameEvent(Tick);
-public sealed record SubDestroyed(int Tick) : GameEvent(Tick);
+public sealed record SubDestroyed(int Tick, SubDeathCause Cause) : GameEvent(Tick);
 
 public enum DestructionCause { DirectHit, Blast, Defense, TorpedoCollision }
 public enum RejectionReason { NoAmmo, Reloading, NoneAvailable }
+
+/// <summary>
+/// Cómo terminó la corrida. Morir por descuido de rumbo y morir bajo fuego son dos lecciones
+/// distintas, y la telemetría necesita poder separarlas.
+/// </summary>
+public enum SubDeathCause { Torpedoes, Collision }
