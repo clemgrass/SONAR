@@ -103,6 +103,7 @@ public partial class Main : Node
     private bool _selfTest;
     private int _frame;
     private bool _sawStatus;
+    private int _announcedWave;
 
     /// <summary>
     /// Guion tecleado, una tecla por paso. `\n` es Enter. Va en minúscula a propósito: así
@@ -195,6 +196,14 @@ public partial class Main : Node
         _lastTick = snap.Tick;
         _sonar.SetSnapshot(snap);
 
+        // El director de oleadas no emite eventos —es guion, no simulación—, así que la
+        // presentación detecta el cambio comparando.
+        if (_controller.Wave != _announcedWave)
+        {
+            _announcedWave = _controller.Wave;
+            Instrument($"— WAVE {_announcedWave} —");
+        }
+
         _hud.Text =
             $"{MissionClock(snap.Tick)}    wave {_controller.Wave}    " +
             $"ammo {snap.AmmoLoaded}/{snap.AmmoReserve}    " +
@@ -283,6 +292,10 @@ public partial class Main : Node
             case ReloadStarted: Instrument("RELOADING"); break;
             case ReloadCompleted e: Instrument($"RELOAD COMPLETE · {e.AmmoLoaded}"); break;
             case SonarToggled e: Instrument(e.Running ? "SWEEP RUNNING" : "SWEEP STOPPED"); break;
+            case SweepCompleted e:
+                Instrument($"SWEEP {e.Revolution} · {e.ReadingCount} CONTACTS");
+                break;
+
             case StatusReported e:
                 _sawStatus = true;
                 Instrument($"AMMO {e.AmmoLoaded}/{e.AmmoReserve} · DEFENSES {e.Defenses}");
