@@ -18,10 +18,15 @@ public partial class Main : Node
 {
     private const int Seed = 20260811;
 
+    private const double SubSpeed = 0.012;
+    private static readonly Bearing Course = new(0);
+
     private readonly SessionMetrics _metrics = new();
 
     /// <summary>Último tick visto. Solo para el resumen de salida.</summary>
     private int _lastTick;
+
+    private double _tickDuration;
 
     private GameController _controller = null!;
     private SonarView _sonar = null!;
@@ -37,12 +42,13 @@ public partial class Main : Node
         _hud = GetNode<Label>("%Hud");
 
         var config = LoadConfig();
+        _tickDuration = config.TickDurationSeconds;
         _sonar.SetGeometry(config.DeadZoneRadius, config.BandOuterRadii.ToArray(),
             config.SweepPeriodSeconds / config.TickDurationSeconds);
 
-        _controller = new GameController(
-            config, Seed, OpeningScenario.Course, OpeningScenario.SubSpeed);
-        _controller.SetContacts(OpeningScenario.Contacts(config));
+        // El director de oleadas vive dentro del GameController: acá sólo se le da rumbo y
+        // avance, y él coloca los contactos cuando toca.
+        _controller = new GameController(config, Seed, Course, SubSpeed);
 
         _input.TextSubmitted += OnCommandSubmitted;
         _input.TextChanged += OnTextChanged;
@@ -98,7 +104,7 @@ public partial class Main : Node
     /// Guion tecleado, una tecla por paso. `\n` es Enter. Va en minúscula a propósito: así
     /// el arnés comprueba de paso la conversión a mayúsculas.
     /// </summary>
-    private const string SelfTestScript = "c047\nstatus\n";
+    private const string SelfTestScript = "start\nc047\nstatus\nretry\n";
 
     private const int SettleFrames = 30;
     private const int FramesPerKey = 3;
@@ -145,11 +151,16 @@ public partial class Main : Node
 
     private void ReportSelfTest()
     {
+        // Cuatro comandos: START, el disparo, STATUS y el RETRY que debe ser ignorado.
+        // Que Started siga en true y Attempt en 1 es lo que fija que RETRY con el submarino
+        // vivo no reinicie nada ni devuelva al instructivo.
         var expected = _controller.Snapshot.AmmoLoaded == 2;   // el disparo consumió uno
-        var ok = _metrics.Commands == 2 && _metrics.ShotsFired == 1 && _sawStatus && expected;
+        var ok = _metrics.Commands == 4 && _metrics.ShotsFired == 1 && _sawStatus
+                 && _controller.Started && _controller.Attempt == 1 && expected;
 
-        GD.Print($"[SELFTEST] {(ok ? "PASA" : "FALLA")} · commands={_metrics.Commands}/2 " +
+        GD.Print($"[SELFTEST] {(ok ? "PASA" : "FALLA")} · commands={_metrics.Commands}/4 " +
                  $"shots={_metrics.ShotsFired}/1 status={_sawStatus} " +
+                 $"started={_controller.Started} attempt={_controller.Attempt}/1 " +
                  $"ammo={_controller.Snapshot.AmmoLoaded}/2");
 
         if (!ok) GD.PushError("El terminal perdió el segundo comando: se puede escribir uno solo sin clic.");
@@ -180,11 +191,23 @@ public partial class Main : Node
         _sonar.SetSnapshot(snap);
 
         _hud.Text =
-            $"tick {snap.Tick}    ammo {snap.AmmoLoaded}/{snap.AmmoReserve}    " +
+            $"{MissionClock(snap.Tick)}    wave {_controller.Wave}    " +
+            $"ammo {snap.AmmoLoaded}/{snap.AmmoReserve}    " +
             $"defenses {snap.DefensesAvailable}    hits {snap.HitsTaken}/2" +
             (snap.ReloadInProgress ? "    RELOADING" : string.Empty) +
             (snap.SweepRunning ? string.Empty : "    SWEEP STOPPED") +
-            (snap.Destroyed ? "    DESTROYED" : string.Empty);
+            (snap.Destroyed ? "    DESTROYED — TYPE RETRY" : string.Empty);
+    }
+
+    /// <summary>
+    /// El mismo número que el tick, contado como tiempo en el puesto. Cambiar la unidad
+    /// cambia lo que el número significa para quien lo lee: `tick 748` es salida de
+    /// depuración, `00:12` es una guardia.
+    /// </summary>
+    private string MissionClock(int tick)
+    {
+        var seconds = tick * _tickDuration;
+        return $"{(int)(seconds / 60):D2}:{(int)(seconds % 60):D2}";
     }
 
     /// <summary>
