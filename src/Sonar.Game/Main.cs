@@ -40,6 +40,8 @@ public partial class Main : Node
     private TelemetryWriter _telemetry = null!;
     private SessionRecorder _recorder = null!;
     private int _recordedAttempt;
+    private bool _runEndRecorded;
+    private string _lastDeathCause = "Unknown";
 
     public override void _Ready()
     {
@@ -187,6 +189,18 @@ public partial class Main : Node
     {
         if (_selfTest) RunSelfTest();
 
+        // RETRY reinicia la corrida dentro del controller sin emitir un evento propio: se
+        // detecta comparando el número de intento contra el último que se registró.
+        if (_controller.Attempt != _recordedAttempt)
+        {
+            _recordedAttempt = _controller.Attempt;
+            _recorder.RunStarted(_controller.Attempt, _controller.Seed);
+            _announcedWave = 0;
+            _runEndRecorded = false;
+            _lastDeathCause = "Unknown";
+            _eventLog.Queue(Dim, $"— ATTEMPT {_controller.Attempt} —");
+        }
+
         // Los eventos son cosas que pasaron y se consumen una vez; el snapshot es cómo
         // está el mundo ahora y se puede leer siempre. Ese orden importa.
         foreach (var evt in _controller.Advance(delta)) Report(evt);
@@ -212,6 +226,7 @@ public partial class Main : Node
         {
             _announcedWave = _controller.Wave;
             Instrument($"— WAVE {_announcedWave} —");
+            _recorder.WaveStarted(_announcedWave, snap.Tick, _controller.LiveEnemyCount);
         }
 
         _hud.Text =
@@ -221,6 +236,15 @@ public partial class Main : Node
             (snap.ReloadInProgress ? "    RELOADING" : string.Empty) +
             (snap.SweepRunning ? string.Empty : "    SWEEP STOPPED") +
             (snap.Destroyed ? "    DESTROYED — TYPE RETRY" : string.Empty);
+
+        if (snap.Destroyed && !_runEndRecorded)
+        {
+            _runEndRecorded = true;
+            _recorder.FlushWave(snap.Tick);
+            _recorder.RunEnded(_controller.Attempt, snap.Tick, _lastDeathCause,
+                _controller.Wave, _controller.LiveEnemyCount,
+                snap.AmmoLoaded, snap.AmmoReserve, snap.DefensesAvailable);
+        }
     }
 
     /// <summary>
@@ -318,6 +342,7 @@ public partial class Main : Node
             case EnemyTorpedoDestroyed: Instrument("INBOUND NEUTRALISED"); break;
             case SubHit e: _eventLog.WriteNow(Dim, $"  WE ARE HIT · {e.HitsTaken}/2"); break;
             case SubDestroyed e:
+                _lastDeathCause = e.Cause.ToString();
                 _eventLog.WriteNow(Dim, e.Cause == SubDeathCause.Collision
                     ? "  COLLISION · HULL BREACHED"
                     : "  HULL BREACHED");
