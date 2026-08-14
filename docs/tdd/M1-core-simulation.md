@@ -514,6 +514,16 @@ vacía de eventos. Reiniciar es responsabilidad del Controller, no de Core.
 `[DECIDED]` Corolario de la regla de confirmación (spec §4.6): **el impacto sobre el propio
 submarino se confirma siempre.** No depende del barrido, y el evento se emite en el mismo tick.
 
+`[DECIDED]` **Un contacto enemigo que llegue a `config.SubHitRadius` destruye el submarino de
+inmediato**, sin importar los impactos previos. Es lo que convierte no disparar en una
+consecuencia y no en una espera.
+
+Los contactos **inertes no chocan**: un pecio ya está hundido, y morir contra terreno es una
+muerte barata. Misma lógica que su exención frente a las defensas (§4.4).
+
+`SubDestroyed` lleva una causa, `Torpedoes` o `Collision`. La telemetría necesita separarlas, y
+el jugador también: morir por descuido de rumbo y morir bajo fuego son dos lecciones distintas.
+
 ### 4.8 Recarga
 
 `RELOAD` cuando `AmmoReserve > 0` y no hay recarga en curso:
@@ -589,6 +599,27 @@ La edad de una lectura es `Tick - ObservedAtTick`. Se expone **en ticks** en el 
 edad a opacidad es decisión de presentación y vive en `Sonar.Game`.
 
 ---
+
+`[DECIDED]` Cada cruce del cero emite `SweepCompleted(Revolution, ReadingCount)`. No cambia
+ningún estado ni habilita ninguna acción: es un latido, para que el silencio tenga una unidad
+contable y "hace dos barridos" sea una frase que el jugador pueda pensar.
+
+### 5.3 Evaluación de disparo — sólo telemetría
+
+`[DECIDED]` Al lanzar un torpedo se emite `ShotAssessed` con la separación angular al contacto
+vivo más cercano en marcación, la diferencia entre el centro de la banda pedida y el radio real
+de ese contacto, y la edad de la lectura que el jugador podía ver (-1 si nunca fue barrido).
+
+Se calcula en Core porque necesita la posición **real**, que el snapshot esconde a propósito:
+calcularlo arriba obligaría a filtrar la verdad hacia la presentación y rompería la defensa
+central del diseño.
+
+**No se muestra al jugador.** Mostrarlo le entregaría gratis la corrección que el juego le pide
+calcular. Error contra edad de lectura da la curva de extrapolación, que es la respuesta a la
+pregunta 1 de M1.
+
+Si no hay contactos vivos no se emite: un disparo al vacío no tiene contra qué medirse, y un
+valor sentinela contaminaría los promedios.
 
 ## 6. Comandos y parser
 

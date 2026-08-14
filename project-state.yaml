@@ -36,15 +36,21 @@ progress:
     # 10/10. La escena de Godot es un prototipo feo a propósito, hecho sólo para poder
     # validar el gameplay de M1. El diseño visual definitivo se hace después, cuando las
     # ocho preguntas estén respondidas. Contrato en docs/development/godot-wiring.md.
+  plan_5_gauntlet_rules: done      # 10/10 tareas, 295 tests
+  plan_6_watch_and_telemetry: not_started
+    # La guardia y la telemetría JSONL. Hasta que se haga, src/Sonar.Game NO compila:
+    # Main.cs todavía llama a OpeningScenario, que el plan 5 eliminó.
 
 systems:
   spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
   config_and_validation: done
-  random_source: done              # inyectado pero aún sin consumidores: nada es aleatorio todavía
+  random_source: in_use            # el WaveDirector es el primer consumidor real
   entities: done
   tick_loop: done
   combat: done
-  enemy_threat: done               # IA mínima: dispara recto al origen a intervalos escalonados
+  enemy_threat: done               # IA mínima: dispara recto al origen, uno en el agua a la vez
+  wave_gauntlet: done              # oleadas dobladoras, spawns de borde, START y RETRY
+  shot_telemetry: core_only        # el evento existe; falta escribirlo a disco (plan 6)
   sonar_gating: done               # cruce de barrido + lecturas con gating
   controller: done                 # parser, snapshot, acumulador con tope
   godot_presentation: prototype    # jugable y medido; el diseño visual va después de M1

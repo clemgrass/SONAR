@@ -39,27 +39,38 @@ Es la única clase que la escena necesita tocar.
 ```csharp
 public sealed class GameController
 {
-    public GameController(SimulationConfig config, int seed, Bearing course, double speed);
+    public GameController(SimulationConfig config, int baseSeed, Bearing course, double speed);
 
     public WorldSnapshot Snapshot { get; }
     public IReadOnlyList<GameEvent> LastEvents { get; }
 
-    public void SetContacts(IEnumerable<Contact> contacts);
-    public void SubmitInput(string rawText);
+    public bool Started { get; }        // falso hasta que llegue START
+    public int Attempt { get; }         // intento actual, base 1. RETRY lo incrementa
+    public int Seed { get; }            // semilla de este intento. Anotarla lo reproduce
+    public int Wave { get; }
+    public int LiveEnemyCount { get; }
+
+    public bool SubmitInput(string rawText);
     public IReadOnlyList<GameEvent> Advance(double deltaSeconds);
 }
 ```
 
 - **`Advance(delta)`** acumula tiempo real y corre los ticks completos que quepan. La
-  simulación nunca ve tiempo de pared. Devuelve los eventos de esos ticks.
+  simulación nunca ve tiempo de pared. Devuelve los eventos de esos ticks. **Antes de `START`
+  no hace nada y tampoco acumula**: si acumulara, quien se toma dos minutos leyendo el
+  instructivo recibiría una avalancha de ticks al arrancar.
 - **`SubmitInput(texto)`** parsea y **encola**. El comando se aplica en la próxima frontera
   de tick, nunca a mitad. Texto vacío no encola nada. Texto que no es un comando encola un
-  `UnrecognizedInput`, que no es un error.
+  `UnrecognizedInput`, que no es un error. Devuelve si entendió el texto — la escena no puede
+  deducirlo, porque el parser vive acá dentro.
 - **`Snapshot`** se reconstruye en cada `Advance`. Es inmutable: guardarlo entre frames es
   seguro, mutarlo es imposible.
 
-No hay `Pause()`, no hay `Reset()`, no hay acceso al `WorldState`. Si hace falta alguno,
-se agrega acá y se testea acá, no en la escena.
+**No hay `SetContacts`.** Los contactos los coloca el `WaveDirector`, que vive dentro del
+controller: la escena le da rumbo y avance, y él arma las oleadas cuando toca.
+
+No hay `Pause()` ni acceso al `WorldState`. Si hace falta alguno, se agrega acá y se testea
+acá, no en la escena.
 
 ---
 
@@ -222,7 +233,9 @@ Todos heredan de `GameEvent` y traen `int Tick`. Están en `Sonar.Core.Events`.
 | `EnemyTorpedoFired` | `TorpedoId`, `SourceContactId` | Ruido de lanzamiento enemigo |
 | `EnemyTorpedoDestroyed` | `TorpedoId`, `Position`, `Cause` | Un torpedo enemigo murió |
 | `SubHit` | `HitsTaken` | Te pegaron. A los 2 se acaba |
-| `SubDestroyed` | — | Fin de corrida |
+| `SweepCompleted` | `Revolution`, `ReadingCount` | El haz dio una vuelta. Latido del silencio |
+| `ShotAssessed` | error angular, error radial, edad de lectura | **No mostrar.** Sólo telemetría |
+| `SubDestroyed` | `Cause` | `Torpedoes` o `Collision` |
 
 `DestructionCause`: `DirectHit`, `Blast`, `Defense`, `TorpedoCollision`.
 `RejectionReason`: `NoAmmo`, `Reloading`, `NoneAvailable`.
@@ -325,7 +338,9 @@ Lo pinchan `OpeningScenarioTests`, que fallan si el escenario se vuelve a degene
 |---|---|
 | `C047`, `c47`, `FIRE C047`, `F C047` | Dispara a marcación 047, banda C |
 | `DEF C047`, `DEFEND C047` | Despliega defensa ahí |
+| `START` | Arranca la corrida. Antes de esto el mundo está detenido |
 | `RELOAD` | Carga **un** torpedo. **No pausa el mundo**: el haz sigue girando |
+| `RETRY` | Reinicia desde cero. Sólo con el submarino destruido |
 | `SONAR` | Alterna el barrido |
 | `STATUS` | Reporta munición y defensas |
 
@@ -337,6 +352,15 @@ Mayúsculas, minúsculas y espacios de sobra dan igual. Lo que **no** se acepta:
 - Cualquier otra cosa → `UnrecognizedInput`, que se registra y no hace nada
 
 El número de bandas sale de la configuración, no está fijo en el parser.
+
+**El mundo no corre hasta `START`.** No es un detalle de flujo: la demo tiene que poder abrirse
+sin nadie al lado que la explique, y eso exige un momento con el reloj detenido en el que leer
+las instrucciones. Antes de `START` los demás comandos se parsean pero **no se encolan** — uno
+encolado se dispararía en el instante en que el jugador arranca. `RETRY` reinicia la corrida
+pero **no** devuelve al instructivo.
+
+**Un contacto enemigo que te alcance te mata de una**, sin importar los impactos previos. Los
+pecios inertes no chocan.
 
 ---
 
