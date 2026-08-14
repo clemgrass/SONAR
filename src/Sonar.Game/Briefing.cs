@@ -4,51 +4,48 @@ namespace Sonar.Game;
 /// Lo que el jugador lee antes de escribir START, con el mundo detenido.
 ///
 /// Está en un archivo aparte porque es **contenido**, no cableado: se va a reescribir muchas
-/// veces mirando cómo se traba la gente, y no conviene tener que abrir Main.cs para eso.
+/// veces mirando dónde se traba la gente, y no conviene abrir Main.cs para eso.
 ///
 /// En inglés, como todo lo que ve el jugador. Sale de golpe y sin ritmo: es texto de
 /// referencia para leer al propio paso, no una secuencia con dramaturgia.
+///
+/// **Restricción dura: tiene que caber en el panel sin scrollear.** Con el panel de 450×650
+/// a cuerpo 15 entran unas 34 líneas de hasta ~46 caracteres. Una versión anterior se pasaba
+/// de largo y arrancaba desplazada al final, dejando arriba del pliegue justo lo único que
+/// hay que entender sí o sí — que la marca es dónde el contacto **estaba**. Además las líneas
+/// largas se envolvían y rompían las columnas de la tabla de comandos. Si agregas líneas,
+/// mide.
 /// </summary>
 public static class Briefing
 {
     public static readonly string[] Lines =
     {
         "SONAR M1 — VALIDATION PROTOTYPE",
+        "YOU ARE THE SONAR OPERATOR.",
         "",
-        "YOU ARE THE SONAR OPERATOR. YOU NEVER SEE THE SEA.",
-        "ALL YOU SEE IS WHAT THE BEAM LAST SWEPT.",
+        "A MARK IS WHERE A CONTACT *WAS* WHEN THE",
+        "BEAM LAST CROSSED IT. NOT WHERE IT IS NOW.",
+        "MARKS FADE AS THEY AGE.",
         "",
-        "READING THE SCOPE",
-        "  THE LINE TURNING AROUND THE CIRCLE IS THE BEAM.",
-        "  A MARK IS WHERE A CONTACT WAS WHEN THE BEAM LAST CROSSED IT.",
-        "  NOT WHERE IT IS NOW. IT HAS MOVED SINCE.",
-        "  MARKS FADE AS THEY AGE. A FAINT MARK IS AN OLD ONE.",
-        "  THE OUTER RING IS GRADUATED IN DEGREES.",
-        "  THE INNER CIRCLES ARE RANGE BANDS, A THROUGH E.",
-        "  NOTHING IS LABELLED. YOU READ THE BEARING AND THE BAND YOURSELF.",
+        "THE OUTER RING IS DEGREES. THE CIRCLES",
+        "ARE RANGE BANDS A TO E. NOTHING IS",
+        "LABELLED — YOU READ THEM YOURSELF.",
         "",
-        "FIRING",
-        "  TYPE A BAND LETTER AND THREE DIGITS OF BEARING, LIKE C047.",
-        "  THE TORPEDO RUNS ALONG THAT BEARING AND DETONATES AT THAT BAND.",
-        "  IT DESTROYS THE FIRST THING IT CROSSES ON THE WAY.",
-        "  IT TAKES SECONDS TO ARRIVE. AIM WHERE THE CONTACT WILL BE.",
+        "A TORPEDO TAKES SECONDS TO ARRIVE AND",
+        "KILLS THE FIRST THING IT CROSSES.",
         "",
         "COMMANDS",
         "  C047      FIRE ON BEARING 047, BAND C",
-        "  DEF C047  DROP A DEFENCE THERE. ONE AT A TIME, SPENT WHEN IT GOES OFF",
-        "  RELOAD    LOAD ONE TORPEDO. THREE TUBES. THE WORLD KEEPS RUNNING",
+        "  DEF C047  DROP A DEFENCE. ONE AT A TIME",
+        "  RELOAD    LOAD ONE TORPEDO. THREE TUBES",
         "  SONAR     STOP OR RESTART THE BEAM",
-        "  STATUS    REPORT AMMUNITION AND DEFENCES",
+        "  STATUS    REPORT AMMO AND DEFENCES",
         "  RETRY     START OVER, ONCE YOU ARE DEAD",
         "",
-        "STAYING ALIVE",
-        "  TWO TORPEDO HITS AND YOU ARE GONE.",
-        "  A CONTACT THAT REACHES YOU KILLS YOU OUTRIGHT. DO NOT LET THEM CLOSE.",
-        "",
-        "THE DEMO",
-        "  CONTACTS COME IN WAVES: ONE, THEN TWO, THEN FOUR, THEN EIGHT.",
-        "  A WAVE ONLY ARRIVES ONCE THE LAST ONE IS GONE.",
-        "  IT IS NOT MEANT TO BE WON. HOW FAR YOU GET IS THE MEASUREMENT.",
+        "TWO TORPEDO HITS AND YOU ARE GONE.",
+        "A CONTACT THAT REACHES YOU KILLS OUTRIGHT.",
+        "WAVES DOUBLE: ONE, TWO, FOUR, EIGHT.",
+        "IT IS NOT MEANT TO BE WON.",
         "",
         "TYPE START WHEN YOU ARE READY.",
     };

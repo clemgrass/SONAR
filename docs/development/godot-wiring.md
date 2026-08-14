@@ -433,38 +433,25 @@ godot-mono --path src/Sonar.Game -- --m1-selftest
 
 Si reconstruyes la escena, córrela.
 
-## 11 · Métricas
+## 11 · Telemetría
 
-`SessionMetrics` (en `src/Sonar.Game/SessionMetrics.cs`) mide la pregunta 2 de M1 y la tasa
-de acierto que sirve de proxy para la 1. Conexión:
+La fuente de verdad es `user://m1-session.jsonl`, una línea JSON por evento, escrita
+incrementalmente. `SessionRecorder` traduce el flujo de eventos; `TelemetryWriter` lo escribe.
+`SessionMetrics` sigue existiendo y alimenta el CSV resumen.
 
-```csharp
-private readonly SessionMetrics _metrics = new();
+Tres reglas que conviene no romper al rehacer la escena:
 
-// en _Ready, después de darle foco al campo de texto:
-_input.TextChanged += _ => _metrics.NoteKeystroke();
+1. **`_recorder.Observe(evt)` va como primera línea del manejador de eventos.** Si se filtra
+   por tipo antes, se pierden mediciones sin que nadie se entere.
+2. **Se guardan eventos, no promedios.** De los eventos se derivan los agregados; al revés no.
+3. **Nada personal.** Id anónimo, sin usuario, sin rutas, sin nombre de máquina. Y el juego
+   dice en pantalla qué guarda, junto al instructivo.
 
-// primera línea de OnCommandSubmitted:
-_metrics.NoteSubmit();
+`ShotAssessed` es la medición central y **no se dibuja**: mostrarla le entregaría al jugador
+la corrección que el juego le pide calcular.
 
-// en el manejo de eventos:
-case TorpedoFired e:      _metrics.NoteShot(); /* ... */ break;
-case ContactDestroyed e:  _metrics.NoteKill(); /* ... */ break;
-
-// y el volcado — conviene en los dos, porque cerrar la ventana y detener desde
-// el editor (F8) no disparan la misma notificación:
-public override void _Notification(int what)
-{
-    if (what == NotificationWMCloseRequest) _metrics.WriteReport();
-}
-
-public override void _ExitTree() => _metrics.WriteReport();
-```
-
-`WriteReport` es idempotente, así que llamarla dos veces no duplica nada. Escribe
-`user://m1-session.csv`.
-
----
+Se escribe incrementalmente y no al cerrar: un cierre forzado perdería la sesión entera, y con
+oleadas y RETRY las sesiones se alargan.
 
 ## 12 · Lo que M1 no está midiendo
 

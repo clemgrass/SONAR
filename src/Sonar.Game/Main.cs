@@ -83,14 +83,15 @@ public partial class Main : Node
         // durante diez segundos delante de alguien que sólo quiere leerlo entero.
         foreach (var line in Briefing.Lines) _eventLog.WriteNow(Dim, line);
 
-        // El aviso de privacidad va con el mismo ritmo que el instructivo: sin ritmo y de
-        // golpe. El plan original lo encolaba con Queue, pero eso lo haría desfilar diez
-        // segundos después, mezclado con el resto del historial, en vez de quedar a la vista
-        // desde el primer frame junto con lo que explica qué hace el prototipo.
-        _eventLog.WriteNow(Dim,
-            $"THIS PROTOTYPE RECORDS ANONYMOUS PLAY DATA TO {TelemetryWriter.Path}");
-        _eventLog.WriteNow(Dim,
-            "COMMANDS, SHOTS AND TIMINGS ONLY · NO PERSONAL INFORMATION");
+        // El aviso de privacidad va sin ritmo y de golpe, igual que el instructivo. El plan
+        // original lo encolaba con Queue, pero eso lo haría desfilar diez segundos después,
+        // mezclado con el resto del historial, en vez de estar a la vista desde el primer
+        // frame junto a lo que explica qué hace el prototipo.
+        //
+        // Corta a propósito y sin la ruta: el panel envuelve pasados ~46 caracteres, y una
+        // línea envuelta acá empuja el título del instructivo fuera de la pantalla. Dónde
+        // queda el archivo está en docs/development/m1-findings.md.
+        _eventLog.WriteNow(Dim, "RECORDS ANONYMOUS PLAY DATA · NO PERSONAL INFO");
     }
 
     /// <summary>
