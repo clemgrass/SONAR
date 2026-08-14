@@ -1797,6 +1797,10 @@ Eso significa que el test *"semillas distintas producen resultados distintos"* d
 Se escribirá cuando exista la primera fuente que realmente la use — probablemente la generación
 de encuentros del guion de misión, en un milestone posterior.
 
+> **Resuelto el 2026-08-13.** El `WaveDirector` del plan 5 es el primer consumidor real de
+> `IRandomSource`, y el test vive en
+> `GauntletDeterminismTests.DifferentSeed_ProducesADifferentRun`.
+
 ## Qué sigue
 
 **Plan 4 — Sonar, Controller y Godot:** registro de lecturas con gating por clase, `Sonar.Controller`
