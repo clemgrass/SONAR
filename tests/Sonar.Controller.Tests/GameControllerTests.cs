@@ -30,7 +30,20 @@ public class GameControllerTests
         ReloadTicks = 300,
     };
 
-    private static GameController New() => new(Config(), seed: 1, course: new Bearing(0), speed: 0.05);
+    /// <summary>
+    /// Controller ya arrancado. Es lo que quieren casi todos los tests: sin START el mundo
+    /// está detenido a propósito y ningún Advance corre un solo tick.
+    /// </summary>
+    private static GameController New()
+    {
+        var controller = NewBeforeStart();
+        controller.SubmitInput("START");
+        return controller;
+    }
+
+    /// <summary>Antes de START, para los tests que prueban justamente esa compuerta.</summary>
+    private static GameController NewBeforeStart() =>
+        new(Config(), baseSeed: 1, course: new Bearing(0), speed: 0.012);
 
     [Fact]
     public void Advance_RunsOneTickPerTickDuration()
@@ -161,5 +174,138 @@ public class GameControllerTests
         var first = controller.Snapshot;
         controller.Advance(1.0 / 60.0);
         Assert.NotSame(first, controller.Snapshot);
+    }
+
+    [Fact]
+    public void Waves_ArriveThroughTheController()
+    {
+        var config = Config();
+        var controller = New();
+
+        // Antes del silencio inicial no hay nada.
+        for (var i = 0; i < WaveDirector.OpeningQuietTicks - 1; i++)
+            controller.Advance(config.TickDurationSeconds);
+        Assert.Equal(0, controller.Wave);
+        Assert.Equal(0, controller.LiveEnemyCount);
+
+        for (var i = 0; i < 10; i++) controller.Advance(config.TickDurationSeconds);
+
+        Assert.Equal(1, controller.Wave);
+        Assert.Equal(1, controller.LiveEnemyCount);
+    }
+
+    [Fact]
+    public void NothingRunsBeforeStart()
+    {
+        // La demo tiene que poder explicarse sola. Sin un momento con el reloj detenido, el
+        // jugador nuevo lee las instrucciones mientras lo matan.
+        var config = Config();
+        var controller = NewBeforeStart();
+
+        for (var i = 0; i < 3000; i++)
+        {
+            Assert.Empty(controller.Advance(config.TickDurationSeconds));
+        }
+
+        Assert.False(controller.Started);
+        Assert.Equal(0, controller.Snapshot.Tick);
+        Assert.Equal(0, controller.Wave);
+    }
+
+    [Fact]
+    public void Start_SetsTheWorldRunning()
+    {
+        var config = Config();
+        var controller = NewBeforeStart();
+
+        Assert.True(controller.SubmitInput("START"));
+        Assert.True(controller.Started);
+
+        for (var i = 0; i < 60; i++) controller.Advance(config.TickDurationSeconds);
+        Assert.Equal(60, controller.Snapshot.Tick);
+    }
+
+    [Fact]
+    public void Retry_DoesNotSendYouBackToTheBriefing()
+    {
+        // Volver a leer el instructivo en cada muerte es tedio, no enseñanza.
+        var config = Config();
+        var controller = New();
+        for (var i = 0; i < 60; i++) controller.Advance(config.TickDurationSeconds);
+
+        controller.ForceDestroyForTests();
+        controller.SubmitInput("RETRY");
+
+        Assert.True(controller.Started);
+        Assert.Equal(0, controller.Snapshot.Tick);
+
+        controller.Advance(config.TickDurationSeconds);
+        Assert.Equal(1, controller.Snapshot.Tick);
+    }
+
+    [Fact]
+    public void SubmitInput_ReportsWhetherItUnderstood()
+    {
+        // La telemetría necesita saberlo y la escena no puede deducirlo: el parser vive
+        // dentro del controller.
+        var controller = New();
+
+        Assert.True(controller.SubmitInput("C047"));
+        Assert.False(controller.SubmitInput("hello"));
+        Assert.False(controller.SubmitInput("   "));
+    }
+
+    [Fact]
+    public void Retry_RestartsFromZeroWithADifferentSeed()
+    {
+        var config = Config();
+        var controller = New();
+
+        for (var i = 0; i < 600; i++) controller.Advance(config.TickDurationSeconds);
+        var firstSeed = controller.Seed;
+        Assert.True(controller.Snapshot.Tick > 0);
+
+        controller.ForceDestroyForTests();
+        controller.SubmitInput("RETRY");
+
+        Assert.Equal(0, controller.Snapshot.Tick);
+        Assert.False(controller.Snapshot.Destroyed);
+        Assert.Equal(0, controller.Wave);
+        Assert.Equal(2, controller.Attempt);
+        Assert.NotEqual(firstSeed, controller.Seed);
+    }
+
+    [Fact]
+    public void Retry_IsIgnoredWhileAlive()
+    {
+        var config = Config();
+        var controller = New();
+        for (var i = 0; i < 600; i++) controller.Advance(config.TickDurationSeconds);
+
+        var tick = controller.Snapshot.Tick;
+        controller.SubmitInput("RETRY");
+
+        Assert.Equal(tick, controller.Snapshot.Tick);
+        Assert.Equal(1, controller.Attempt);
+    }
+
+    [Fact]
+    public void SameBaseSeed_ReproducesTheWholeSession()
+    {
+        // Semilla base más número de intento: la sesión completa es reproducible aunque los
+        // spawns cambien entre intentos.
+        static int[] SpawnBearings(GameController c, SimulationConfig cfg)
+        {
+            for (var i = 0; i < WaveDirector.OpeningQuietTicks + 10; i++)
+                c.Advance(cfg.TickDurationSeconds);
+            return c.SpawnedBearingsForTests();
+        }
+
+        var config = Config();
+        var first = SpawnBearings(New(), config);
+
+        // Sin esto el test es vacuo: dos listas vacías también son iguales.
+        Assert.NotEmpty(first);
+        Assert.Equal(first, SpawnBearings(New(), config));
     }
 }
