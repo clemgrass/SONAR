@@ -19,6 +19,7 @@ public sealed class SessionRecorder
     private int _waveStartTick;
     private int _waveShots;
     private int _waveKills;
+    private int _lastCommandTick = -1;
 
     public SessionRecorder(TelemetryWriter writer) => _writer = writer;
 
@@ -35,11 +36,22 @@ public sealed class SessionRecorder
             .Add("defenses", defenses));
     }
 
-    /// <summary>Texto crudo tal como se escribió. Los typos son dato, no ruido.</summary>
-    public void Command(int tick, string raw, bool recognised, double composeSeconds) =>
+    /// <summary>
+    /// Texto crudo tal como se escribió. Los typos son dato, no ruido.
+    ///
+    /// `gapTicks` es el silencio desde el comando anterior. Con eso se puede preguntar si el
+    /// ritmo funciona — y en particular si teclean algo durante los diez segundos iniciales,
+    /// que sería señal de que el silencio se lee como que el juego está roto.
+    /// </summary>
+    public void Command(int tick, string raw, bool recognised, double composeSeconds)
+    {
         _writer.Write(new JsonLine("cmd")
             .Add("tick", tick).Add("raw", raw)
-            .Add("ok", recognised).Add("compose", composeSeconds));
+            .Add("ok", recognised).Add("compose", composeSeconds)
+            .Add("gapTicks", _lastCommandTick < 0 ? -1 : tick - _lastCommandTick));
+
+        _lastCommandTick = tick;
+    }
 
     public void WaveStarted(int wave, int tick, int spawned)
     {

@@ -82,6 +82,15 @@ public partial class Main : Node
         // Sin ritmo y de golpe: es texto de referencia, y encolarlo lo haría desfilar
         // durante diez segundos delante de alguien que sólo quiere leerlo entero.
         foreach (var line in Briefing.Lines) _eventLog.WriteNow(Dim, line);
+
+        // El aviso de privacidad va con el mismo ritmo que el instructivo: sin ritmo y de
+        // golpe. El plan original lo encolaba con Queue, pero eso lo haría desfilar diez
+        // segundos después, mezclado con el resto del historial, en vez de quedar a la vista
+        // desde el primer frame junto con lo que explica qué hace el prototipo.
+        _eventLog.WriteNow(Dim,
+            $"THIS PROTOTYPE RECORDS ANONYMOUS PLAY DATA TO {TelemetryWriter.Path}");
+        _eventLog.WriteNow(Dim,
+            "COMMANDS, SHOTS AND TIMINGS ONLY · NO PERSONAL INFORMATION");
     }
 
     /// <summary>
