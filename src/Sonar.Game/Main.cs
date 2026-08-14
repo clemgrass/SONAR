@@ -33,6 +33,8 @@ public partial class Main : Node
     private LineEdit _input = null!;
     private RichTextLabel _log = null!;
     private Label _hud = null!;
+    private EventLog _eventLog = null!;
+    private bool _announcedStart;
 
     public override void _Ready()
     {
@@ -40,6 +42,7 @@ public partial class Main : Node
         _input = GetNode<LineEdit>("%CommandInput");
         _log = GetNode<RichTextLabel>("%Log");
         _hud = GetNode<Label>("%Hud");
+        _eventLog = new EventLog(_log);
 
         var config = LoadConfig();
         _tickDuration = config.TickDurationSeconds;
@@ -64,8 +67,9 @@ public partial class Main : Node
 
         _selfTest = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--m1-selftest") >= 0;
 
-        Append(Dim, "SONAR M1 — VALIDATION PROTOTYPE");
-        Append(Dim, "TYPE C047 AND PRESS ENTER · RELOAD · SONAR · STATUS · DEF C047");
+        // Sin ritmo y de golpe: es texto de referencia, y encolarlo lo haría desfilar
+        // durante diez segundos delante de alguien que sólo quiere leerlo entero.
+        foreach (var line in Briefing.Lines) _eventLog.WriteNow(Dim, line);
     }
 
     /// <summary>
@@ -175,6 +179,7 @@ public partial class Main : Node
         // Los eventos son cosas que pasaron y se consumen una vez; el snapshot es cómo
         // está el mundo ahora y se puede leer siempre. Ese orden importa.
         foreach (var evt in _controller.Advance(delta)) Report(evt);
+        _eventLog.Advance(delta);
 
         // El terminal siempre tiene que estar listo para escribir, sin tener que tocarlo.
         // Las dos condiciones son distintas y hacen falta las dos: el foco se pierde al
@@ -233,8 +238,14 @@ public partial class Main : Node
         _metrics.NoteSubmit();
 
         var command = text.ToUpperInvariant();
-        Append(Typed, $"> {command}");
+        _eventLog.Queue(Typed, $"> {command}");
         _controller.SubmitInput(command);
+
+        if (_controller.Started && !_announcedStart)
+        {
+            _announcedStart = true;
+            _eventLog.Queue(Dim, "  BEAM RUNNING · GOOD HUNTING");
+        }
 
         _input.Clear();
 
@@ -278,8 +289,12 @@ public partial class Main : Node
                 break;
             case EnemyTorpedoFired: Instrument("LAUNCH TRANSIENT"); break;
             case EnemyTorpedoDestroyed: Instrument("INBOUND NEUTRALISED"); break;
-            case SubHit e: Instrument($"WE ARE HIT · {e.HitsTaken}/2"); break;
-            case SubDestroyed: Instrument("HULL BREACHED"); break;
+            case SubHit e: _eventLog.WriteNow(Dim, $"  WE ARE HIT · {e.HitsTaken}/2"); break;
+            case SubDestroyed e:
+                _eventLog.WriteNow(Dim, e.Cause == SubDeathCause.Collision
+                    ? "  COLLISION · HULL BREACHED"
+                    : "  HULL BREACHED");
+                break;
 
             // NearMiss no se muestra: es base de la pista 2, sin efecto en M1 (spec §4.10).
             // InputNotRecognized ya quedó registrado al escribirlo.
@@ -289,18 +304,7 @@ public partial class Main : Node
     private const string Dim = "#5d8f74";     // registro de instrumento
     private const string Typed = "#fde047";   // registro de comando
 
-    private void Instrument(string text) => Append(Dim, $"  {text}");
-
-    /// <summary>
-    /// El color va como etiqueta aparte del contenido a propósito: el historial se muestra
-    /// todo en mayúscula, y pasar la línea entera por ToUpperInvariant convertiría
-    /// [color=...] en [COLOR=...], que el parser de BBCode de Godot no reconoce.
-    /// </summary>
-    private void Append(string color, string content)
-    {
-        _log.AppendText($"[color={color}]{content.ToUpperInvariant()}[/color]\n");
-        _log.ScrollToLine(_log.GetLineCount() - 1);
-    }
+    private void Instrument(string text) => _eventLog.Queue(Dim, $"  {text}");
 
     // Cerrar la ventana y detener desde el editor no disparan la misma notificación, y una
     // sesión medida que no se guarda es una sesión perdida. WriteReport es idempotente.
