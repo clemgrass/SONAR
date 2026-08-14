@@ -27,6 +27,7 @@ public class SimulationConfigTests
         MagazineSize = 4,
         AmmoReserve = 12,
         ReloadTicks = 300,
+        EnemyReloadTicks = 600,
     };
 
     [Fact]
@@ -95,6 +96,25 @@ public class SimulationConfigTests
     {
         var config = Valid() with { EnemyFireIntervalTicks = 0 };
         Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsNonPositiveEnemyReload()
+    {
+        var config = Valid() with { EnemyReloadTicks = 0 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
+    public void Validate_RejectsAnEnemyThatCyclesFasterThanThePlayer()
+    {
+        // El stunlock que motivó el nerfeo vuelve solo si alguien sube la recarga del
+        // jugador y se olvida de la enemiga. Que reviente al arrancar, no en la partida.
+        var config = Valid() with { ReloadTicks = 300, EnemyReloadTicks = 299 };
+        Assert.Throws<ArgumentException>(config.Validate);
+
+        // Igualarlos ya es legal: el piso es "nunca más rápido", no "siempre más lento".
+        (Valid() with { ReloadTicks = 300, EnemyReloadTicks = 300 }).Validate();
     }
 
     [Fact]

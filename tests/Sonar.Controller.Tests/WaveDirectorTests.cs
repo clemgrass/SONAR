@@ -29,6 +29,7 @@ public class WaveDirectorTests
         MagazineSize = 3,
         AmmoReserve = 12,
         ReloadTicks = 420,
+        EnemyReloadTicks = 840,
     };
 
     private static WaveDirector New(int seed = 1) =>
@@ -141,6 +142,31 @@ public class WaveDirectorTests
 
         Assert.True(third > first * 1.5,
             $"La tercera oleada no cierra más rápido: {first:F4} -> {third:F4}.");
+    }
+
+    [Fact]
+    public void NoHullEverOutrunsHalfATorpedo()
+    {
+        // El contraste de velocidades es lo que hace que el torpedo se lea como rápido.
+        // La escalada por oleada tiene techo justamente aquí: sin él, alrededor de la
+        // oleada 5 los cascos alcanzaban a sus propias municiones.
+        var config = Config();
+        var ceiling = config.EnemyTorpedoSpeed / 2.0;
+        var log = RunClearingInstantly(New(), 20000);
+
+        foreach (var (tick, spawned) in log)
+        foreach (var contact in spawned)
+        {
+            var net = (contact.Velocity + new Vec2(0.0, 0.012)).Length;
+            Assert.True(net <= ceiling + 1e-9,
+                $"El contacto {contact.Id.Value} del tick {tick} cierra a {net:F4}, sobre el techo {ceiling:F4}.");
+        }
+
+        // Control positivo: alguna oleada tiene que llegar realmente al techo. Sin esto el
+        // test pasaría igual si los contactos se hubieran quedado quietos del todo.
+        var fastest = log.SelectMany(e => e.Spawned)
+            .Max(c => (c.Velocity + new Vec2(0.0, 0.012)).Length);
+        Assert.Equal(ceiling, fastest, precision: 6);
     }
 
     [Fact]

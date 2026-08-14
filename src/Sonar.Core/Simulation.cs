@@ -136,10 +136,14 @@ public sealed class Simulation : ISimulation
     /// no elige blanco — el §63.11 completo va a un milestone posterior. Lo que M1 mide es
     /// al jugador bajo presión, no la inteligencia del enemigo.
     ///
-    /// Juega con las mismas reglas de munición que el jugador: <b>un solo torpedo en el agua
-    /// a la vez</b>, y tras disparar tarda `config.ReloadTicks` en recargar — el mismo
-    /// tiempo que cuesta a este lado. Con torpedos lentos, el que manda es el primer límite:
-    /// mientras el suyo siga viajando, ese enemigo no puede volver a disparar.
+    /// Juega con la misma <i>forma</i> de regla que el jugador pero peor cargador: <b>un solo
+    /// torpedo, que se agota al dispararlo</b>. No tiene ráfaga posible — cada disparo lo
+    /// deja vacío y obliga a recargar, y esa recarga (`config.EnemyReloadTicks`) es más
+    /// lenta que la del jugador. Encima sigue el límite de uno en el agua: mientras el suyo
+    /// viaje, no vuelve a disparar. Con torpedos lentos ése suele ser el que manda.
+    ///
+    /// La asimetría es deliberada. Con ambos lados al mismo reloj el jugador quedaba
+    /// encadenado a esquivar torpedos sin ventana para calcular un disparo propio.
     ///
     /// `EnemyFireIntervalTicks` ya no gobierna la cadencia: sólo lo usa ContactSpawner para
     /// decidir cuándo un contacto recién aparecido queda armado por primera vez.
@@ -167,7 +171,7 @@ public sealed class Simulation : ISimulation
                 _config.EnemyTorpedoSpeed, contact.Id.Value));
             events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
 
-            contacts[i] = contact with { NextFireTick = state.Tick + _config.ReloadTicks };
+            contacts[i] = contact with { NextFireTick = state.Tick + _config.EnemyReloadTicks };
         }
 
         return state;

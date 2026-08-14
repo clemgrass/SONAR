@@ -63,3 +63,31 @@ y vuelve al spec antes de escribir narrativa:
 ## Notas de sesión
 
 <!-- Una entrada por sesión: fecha, qué valores se probaron, qué se observó. -->
+
+### 2026-08-14 — nerfeo enemigo
+
+**Observado en juego:** stunlock de misiles. Los enemigos disparaban al mismo ritmo que el
+jugador y no quedaba ventana para calcular un disparo propio; el turno entero era esquivar.
+
+**Cambios:**
+
+| Perilla | Antes | Ahora |
+|---|---|---|
+| Recarga enemiga | `reloadTicks` (420) | `enemyReloadTicks` 840 — número propio, el doble |
+| Munición enemiga | uno en el agua | uno en el agua **y** uno de cargador: disparar vacía |
+| Techo de cierre | sin techo | la mitad de `enemyTorpedoSpeed` (0.015) |
+
+**Medido, no supuesto.** El nerfeo de recarga no hace nada mientras el enemigo esté lejos: de
+la banda C hacia afuera el ciclo lo fija el vuelo del torpedo, no la recarga. Vale el doble
+completo de banda C hacia adentro. Tabla de ciclos por radio en el TDD, §IA enemiga.
+
+Consecuencia directa: **el baseline sin input no se movió** (muere en el tick 4577 contra 4578).
+La oleada 1 tiene un solo enemigo lejano, y ahí el vuelo siempre mandó. Si al jugar la asfixia
+sigue apareciendo temprano, la perilla que queda es `enemyFireIntervalTicks` (cuándo se arma un
+contacto recién entrado) o bajar `enemyTorpedoSpeed`, no la recarga.
+
+El techo de cierre recorta sólo de la oleada 3 en adelante — antes la escalada cruzaba la
+velocidad del propio torpedo cerca de la oleada 5 y los cascos alcanzaban a sus municiones.
+Las oleadas 1 y 2 quedan idénticas, que son las que enseñan a jugar.
+
+- [ ] Pendiente de playtest: ¿la ventana entre disparos enemigos alcanza para componer un tiro?

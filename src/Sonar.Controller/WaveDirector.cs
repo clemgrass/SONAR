@@ -47,6 +47,18 @@ public sealed class WaveDirector
     private const double ClosingBase = 0.006;
     private const double ClosingStep = 0.007;
 
+    /// <summary>
+    /// Techo de la velocidad de cierre, como fracción de la velocidad del torpedo enemigo.
+    /// Un casco nunca puede acercarse a más de la mitad de lo que vuela un torpedo, así el
+    /// torpedo se lee como lo rápido de la escena y el submarino como lo lento.
+    ///
+    /// Sin techo, la escalada por oleada cruzaba la velocidad del propio torpedo alrededor
+    /// de la oleada 5: los cascos alcanzaban a sus municiones y el contraste desaparecía.
+    /// El techo recorta arriba y deja intacto el arranque suave — la oleada 1 sigue casi
+    /// quieta, que es la que enseña a disparar.
+    /// </summary>
+    private const double ClosingCeilingOfTorpedoSpeed = 0.5;
+
     private readonly SimulationConfig _config;
     private readonly IRandomSource _random;
     private readonly Vec2 _worldDrift;
@@ -94,7 +106,8 @@ public sealed class WaveDirector
 
     private IReadOnlyList<Contact> Spawn(int count)
     {
-        var closing = ClosingBase + (Wave - 1) * ClosingStep;
+        var ceiling = _config.EnemyTorpedoSpeed * ClosingCeilingOfTorpedoSpeed;
+        var closing = Math.Min(ClosingBase + (Wave - 1) * ClosingStep, ceiling);
         var spawned = new List<Contact>(count);
 
         // Un sector por contacto, con temblor acotado a la mitad central del sector. Eso

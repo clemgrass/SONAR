@@ -456,18 +456,41 @@ para cada contacto Enemy vivo y dentro de rango, en orden de ContactId:
             Direction       = normalizar(origen - contacto.Position)  // recto al submarino
             Speed           = config.EnemyTorpedoSpeed
             SourceContactId = contacto.Id
-        contacto.NextFireTick = Tick + config.ReloadTicks
+        contacto.NextFireTick = Tick + config.EnemyReloadTicks
         emitir EnemyTorpedoFired(contacto.Id)
 ```
 
-`[DECIDED]` **El enemigo juega con las mismas reglas de munición que el jugador.** Un solo torpedo
-en el agua a la vez, y tras disparar tarda `config.ReloadTicks` en recargar — el mismo reloj que
-cuesta a este lado.
+`[DECIDED]` **El enemigo juega con la misma forma de regla que el jugador, pero con peor cargador.**
+Un solo torpedo en el agua a la vez y un solo torpedo de munición: disparar lo deja vacío y lo
+obliga a recargar. No tiene ráfaga posible.
+
+`[DECIDED]` **Su recarga es más lenta y tiene número propio: `config.EnemyReloadTicks`.** Una
+versión anterior reusaba `ReloadTicks` para los dos lados. Se probó y el resultado fue un stunlock:
+con ambos bandos al mismo reloj el jugador quedaba encadenado a esquivar y nunca abría una ventana
+para calcular un disparo. La cadencia enemiga es una perilla de dificultad, no una simetría de
+reglas. `Validate()` exige `EnemyReloadTicks >= ReloadTicks` para que el stunlock no vuelva solo
+si alguien afina el reloj del jugador y se olvida del otro.
 
 Con torpedos lentos el límite que manda es el primero: mientras su torpedo siga viajando, ese
 enemigo no vuelve a disparar aunque haya recargado hace rato. Eso hace que interceptar un torpedo
 con una defensa o con un torpedo propio no sólo salve el impacto, sino que además **libere al
 enemigo para disparar de nuevo** — un costo que vale la pena tener presente al afinar M1.
+
+Cuál de los dos límites manda depende del radio, y el cruce está medido. Con el tuning de trabajo
+(`enemyTorpedoSpeed 0.03`, `reloadTicks 420`, `enemyReloadTicks 840`) el vuelo domina de la banda C
+hacia afuera y la recarga domina de ahí hacia adentro:
+
+| Radio del enemigo | Ciclo con recarga 420 | Ciclo con recarga 840 |
+|---|---|---|
+| 0.90 | 1711 | 1711 |
+| 0.60 | 1111 | 1111 |
+| 0.40 |  710 |  840 |
+| 0.25 |  420 |  840 |
+| 0.15 |  420 |  840 |
+
+Es decir: **el nerfeo de recarga no cambia nada mientras el enemigo esté lejos, y vale el doble
+completo cuando está encima.** Es donde se quería que valiera — la asfixia aparecía con enemigos
+que ya habían entrado, no con los del borde.
 
 Por eso `Torpedo` lleva `SourceContactId`: es lo que permite responder "¿este enemigo ya tiene uno
 en el agua?".
@@ -848,6 +871,7 @@ public sealed record SimulationConfig
     public double EnemyTorpedoSpeed { get; init; }
     public int EnemyFireIntervalTicks { get; init; }
     public int EnemyFireStaggerTicks { get; init; }
+    public int EnemyReloadTicks { get; init; }
     public double SubHitRadius { get; init; }
 
     public double DefenseRadius { get; init; }

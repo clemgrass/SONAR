@@ -31,6 +31,7 @@ public class SnapshotBuilderTests
         MagazineSize = 4,
         AmmoReserve = 12,
         ReloadTicks = 300,
+        EnemyReloadTicks = 600,
     };
 
     private static WorldState BaseState() =>

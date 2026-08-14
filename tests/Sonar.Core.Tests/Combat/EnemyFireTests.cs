@@ -54,17 +54,28 @@ public class EnemyFireTests
     }
 
     [Fact]
-    public void Enemy_RearmsAfterTheReloadTime()
+    public void Enemy_RearmsOnItsOwnSlowerClock_NotThePlayers()
     {
-        // Los enemigos recargan con el mismo reloj que el jugador: ReloadTicks.
+        // El enemigo lleva un solo torpedo: disparar lo deja vacío y lo obliga a recargar,
+        // y esa recarga es más lenta que la del jugador. La ventana entre ReloadTicks y
+        // EnemyReloadTicks es el nerfeo: es el tiempo que el jugador tiene para pensar un
+        // disparo en vez de estar sólo esquivando.
         var config = TestWorld.Config();
+        Assert.True(config.EnemyReloadTicks > config.ReloadTicks, "el escenario no prueba nada si los relojes coinciden");
+
         var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.95), nextFireTick: 0) });
 
-        var events = new List<GameEvent>();
-        for (var i = 0; i < config.ReloadTicks + 5; i++) events.AddRange(sim.Tick(NoCommands));
+        // Primer tramo: cuando el jugador ya habría recargado, el enemigo sigue vacío.
+        var early = new List<GameEvent>();
+        for (var i = 0; i < config.ReloadTicks + 5; i++) early.AddRange(sim.Tick(NoCommands));
+        Assert.Single(early, e => e is EnemyTorpedoFired);
 
-        Assert.Equal(2, events.Count(e => e is EnemyTorpedoFired));
+        // Segundo tramo: al llegar a su propio reloj, sí vuelve a disparar. Sin este
+        // control el test pasaría igual si el enemigo hubiera dejado de disparar del todo.
+        var late = new List<GameEvent>();
+        for (var i = 0; i < config.EnemyReloadTicks - config.ReloadTicks + 5; i++) late.AddRange(sim.Tick(NoCommands));
+        Assert.Contains(late, e => e is EnemyTorpedoFired);
     }
 
     [Fact]
@@ -74,7 +85,12 @@ public class EnemyFireTests
         // no dispara otro. Con torpedos lentos éste es el límite que manda, no el reloj.
         var config = TestWorld.Config() with
         {
-            ReloadTicks = 30,             // recarga casi instantánea
+            // La recarga tiene que ser la ENEMIGA y tiene que ser corta. Si aquí quedara el
+            // valor de producción (más lento que el del jugador), el enemigo no dispararía
+            // dos veces en 600 ticks de todos modos y el test pasaría sin haber ejercido
+            // nunca la regla de uno en el agua.
+            ReloadTicks = 30,
+            EnemyReloadTicks = 30,        // recarga casi instantánea
             EnemyTorpedoSpeed = 0.05,     // pero el torpedo tarda muchísimo en llegar
         };
         var sim = TestWorld.Still(config);

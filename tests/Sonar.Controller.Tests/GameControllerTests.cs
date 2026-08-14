@@ -28,6 +28,7 @@ public class GameControllerTests
         MagazineSize = 4,
         AmmoReserve = 12,
         ReloadTicks = 300,
+        EnemyReloadTicks = 600,
     };
 
     /// <summary>

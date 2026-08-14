@@ -62,7 +62,7 @@ public class CollisionTests
     [Fact]
     public void TorpedoDeath_StillReportsItsOwnCause()
     {
-        var config = TestWorld.Config() with { ReloadTicks = 30 };
+        var config = TestWorld.Config() with { ReloadTicks = 30, EnemyReloadTicks = 30 };
         var sim = TestWorld.Still(config);
         sim.SetContacts(new[]
         {

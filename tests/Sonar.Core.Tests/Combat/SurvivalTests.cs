@@ -42,7 +42,10 @@ public class SurvivalTests
     [Fact]
     public void SecondHit_DestroysTheSub()
     {
-        var config = TestWorld.Config() with { EnemyFireIntervalTicks = 30 };
+        // La cadencia enemiga la gobierna EnemyReloadTicks; se acorta para no gastar mil
+        // ticks de test esperando el segundo disparo. El reloj del jugador baja con él
+        // porque la config exige que el enemigo nunca cicle más rápido.
+        var config = TestWorld.Config() with { ReloadTicks = 30, EnemyReloadTicks = 30 };
         var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.30), nextFireTick: 0) });
 
@@ -57,7 +60,7 @@ public class SurvivalTests
     [Fact]
     public void AfterDestruction_TickDoesNothing()
     {
-        var config = TestWorld.Config() with { EnemyFireIntervalTicks = 30 };
+        var config = TestWorld.Config() with { ReloadTicks = 30, EnemyReloadTicks = 30 };
         var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.30), nextFireTick: 0) });
 

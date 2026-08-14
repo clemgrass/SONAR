@@ -26,6 +26,7 @@ public static class TestWorld
         MagazineSize = 4,
         AmmoReserve = 12,
         ReloadTicks = 300,
+        EnemyReloadTicks = 600,
     };
 
     /// Submarino inmóvil: sin deriva del mundo. Útil para aislar movimiento propio.

@@ -26,6 +26,15 @@ public sealed record SimulationConfig
     public double EnemyTorpedoSpeed { get; init; }
     public int EnemyFireIntervalTicks { get; init; }
     public int EnemyFireStaggerTicks { get; init; }
+
+    /// <summary>
+    /// Lo que tarda un enemigo en recargar tras disparar. Tiene su propio número —y no
+    /// reusa <see cref="ReloadTicks"/>— porque la cadencia enemiga es una perilla de
+    /// dificultad, no una simetría de reglas: con ambos lados al mismo reloj el jugador
+    /// queda encadenado a esquivar y nunca tiene una ventana para calcular un disparo.
+    /// </summary>
+    public int EnemyReloadTicks { get; init; }
+
     public double SubHitRadius { get; init; }
 
     public double DefenseRadius { get; init; }
@@ -61,6 +70,14 @@ public sealed record SimulationConfig
         if (ReloadTicks <= 0) throw Bad(nameof(ReloadTicks), "debe ser mayor a cero.");
         if (EnemyFireIntervalTicks <= 0) throw Bad(nameof(EnemyFireIntervalTicks), "debe ser mayor a cero.");
         if (EnemyFireStaggerTicks < 0) throw Bad(nameof(EnemyFireStaggerTicks), "no puede ser negativo.");
+        if (EnemyReloadTicks <= 0) throw Bad(nameof(EnemyReloadTicks), "debe ser mayor a cero.");
+
+        // El enemigo nunca puede ciclar más rápido que el jugador. Es la invariante que
+        // protege el nerfeo: si alguien sube ReloadTicks y se olvida de este, el stunlock
+        // vuelve solo. Falla al arrancar en vez de reaparecer como "el juego se siente mal".
+        if (EnemyReloadTicks < ReloadTicks)
+            throw Bad(nameof(EnemyReloadTicks),
+                $"({EnemyReloadTicks}) no puede ser menor a la recarga del jugador ({ReloadTicks}).");
 
         // Invariantes anti-tunneling: nada puede avanzar más por tick que su propio radio
         // de detección, o atravesaría su objetivo sin registrarlo (TDD §3.4).

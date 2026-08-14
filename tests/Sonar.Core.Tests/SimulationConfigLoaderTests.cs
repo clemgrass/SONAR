@@ -28,7 +28,8 @@ public class SimulationConfigLoaderTests
           "defenseCapacity": 3,
           "magazineSize": 4,
           "ammoReserve": 12,
-          "reloadTicks": 300
+          "reloadTicks": 300,
+          "enemyReloadTicks": 600
         }
         """;
 
@@ -61,7 +62,8 @@ public class SimulationConfigLoaderTests
           "defenseCapacity": 3,
           "magazineSize": 4,
           "ammoReserve": 12,
-          "reloadTicks": 300
+          "reloadTicks": 300,
+          "enemyReloadTicks": 600
         }
         """;
 
