@@ -23,6 +23,9 @@ public sealed class SessionMetrics
     public int ContactsDestroyed { get; private set; }
     public int Commands => _composeTimes.Count;
 
+    /// <summary>Duración de composición del último comando enviado.</summary>
+    public double LastComposeSeconds { get; private set; }
+
     public double AverageComposeSeconds =>
         _composeTimes.Count == 0 ? 0 : _composeTimes.Average();
 
@@ -40,6 +43,7 @@ public sealed class SessionMetrics
     {
         if (!_composing) return;
         _composeTimes.Add((Time.GetTicksMsec() - _composeStartedMsec) / 1000.0);
+        LastComposeSeconds = _composeTimes[^1];
         _composing = false;
     }
 

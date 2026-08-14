@@ -7,6 +7,7 @@ using Sonar.Core;
 using Sonar.Core.Entities;
 using Sonar.Core.Events;
 using Sonar.Core.Spatial;
+using Sonar.Game.Telemetry;
 
 namespace Sonar.Game;
 
@@ -36,6 +37,10 @@ public partial class Main : Node
     private EventLog _eventLog = null!;
     private bool _announcedStart;
 
+    private TelemetryWriter _telemetry = null!;
+    private SessionRecorder _recorder = null!;
+    private int _recordedAttempt;
+
     public override void _Ready()
     {
         _sonar = GetNode<SonarView>("%SonarView");
@@ -52,6 +57,11 @@ public partial class Main : Node
         // El director de oleadas vive dentro del GameController: acá sólo se le da rumbo y
         // avance, y él coloca los contactos cuando toca.
         _controller = new GameController(config, Seed, Course, SubSpeed);
+
+        _telemetry = new TelemetryWriter(config, DisplayServer.WindowGetSize());
+        _recorder = new SessionRecorder(_telemetry);
+        _recorder.RunStarted(_controller.Attempt, _controller.Seed);
+        _recordedAttempt = _controller.Attempt;
 
         _input.TextSubmitted += OnCommandSubmitted;
         _input.TextChanged += OnTextChanged;
@@ -248,7 +258,9 @@ public partial class Main : Node
 
         var command = text.ToUpperInvariant();
         _eventLog.Queue(Typed, $"> {command}");
-        _controller.SubmitInput(command);
+        var recognised = _controller.SubmitInput(command);
+        _recorder.Command(_controller.Snapshot.Tick, command, recognised,
+            _metrics.LastComposeSeconds);
 
         if (_controller.Started && !_announcedStart)
         {
@@ -270,6 +282,8 @@ public partial class Main : Node
     /// </summary>
     private void Report(GameEvent evt)
     {
+        _recorder.Observe(evt);
+
         switch (evt)
         {
             case TorpedoFired e:
@@ -329,6 +343,7 @@ public partial class Main : Node
     public override void _ExitTree()
     {
         _metrics.WriteReport();
+        _telemetry.Dispose();
 
         // A la consola además del CSV: durante M1 conviene ver los números al cerrar sin
         // tener que ir a buscar el archivo.
