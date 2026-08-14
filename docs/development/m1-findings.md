@@ -9,10 +9,10 @@ su función, que era avisar a tiempo.
 
 | # | Pregunta | Respuesta | Evidencia |
 |---|---|---|---|
-| 1 | ¿Extrapolar lecturas es satisfactorio? | | tasa de acierto entre sesiones |
-| 2 | Tiempo medio por comando | | `user://m1-session.csv` |
+| 1 | ¿Extrapolar lecturas es satisfactorio? | | `errDeg` contra `ageTicks` en el JSONL |
+| 2 | Tiempo medio por comando | | `compose` en el JSONL |
 | 3 | Máximo de contactos jugable | | |
-| 4 | Período del barrido | | probado 2,5 / 3,5 / 5 s |
+| 4 | Período del barrido | | probado 3,5 / 5 / 7 s |
 | 5 | Número de bandas y radios | | probado 5 y 8 |
 | 6 | ¿Hace falta repetir y ajustar? | | |
 | 7 | ¿La munición aprieta? | | |
@@ -20,12 +20,35 @@ su función, que era avisar a tiempo.
 
 ## Cómo se mide
 
-- **Pregunta 2** sale directo de `avg_compose_seconds` en `user://m1-session.csv`, que se
-  escribe al cerrar el juego. Cuenta desde la primera tecla tras el último Enter.
-- **Pregunta 1** no tiene medida directa. El proxy es `hit_rate` en el mismo archivo, leído
-  a lo largo de varias sesiones: si no sube con la práctica, la habilidad no existe.
-- Las demás se responden jugando y anotando. Cambiar un valor en
-  `config/simulation.working.json` y volver a jugar es el ciclo entero.
+La fuente de verdad es `user://m1-session.jsonl`: una línea JSON por evento, escrita
+incrementalmente. `user://m1-session.csv` es un resumen para mirar de reojo, no para analizar.
+
+En Linux los dos quedan en `~/.local/share/godot/app_userdata/Sonar/`.
+
+| Pregunta | De dónde sale |
+|---|---|
+| 1 · ¿Extrapolar es satisfactorio? | Líneas `shot`: `errDeg` contra `ageTicks`. Si el error crece con la edad de la lectura, la extrapolación existe y cuesta; si es plano, nadie extrapola. Si `errDeg` baja a lo largo de la sesión, se aprende |
+| 2 · Tiempo por comando | Líneas `cmd`, campo `compose` |
+| 3 · Máximo de contactos | Líneas `waveEnd` y `runEnd`: en qué oleada muere la gente y cuántos quedaban vivos |
+| 4 · Período del barrido | La curva de la pregunta 1: dónde `errDeg` se dispara marca el techo |
+| 5 · Bandas y radios | `errRad` en las líneas `shot`, y el `config` de la cabecera para comparar tuning |
+| 6 · ¿Repetir y ajustar? | Campo `raw` de las líneas `cmd`: los typos y las repeticiones aparecen tal cual se escribieron |
+| 7 · ¿La munición aprieta? | Líneas `reload` y `fireRejected`, y `ammoLoaded` en `runEnd` |
+| 8 · ¿La fase extrema se dispara o se sobrevive? | `runEnd` por oleada y causa de muerte |
+
+**La sesión es reproducible.** Con la semilla de la línea `run` y los comandos con su tick se
+puede re-ejecutar la partida de cualquier tester y mirarla. Las preguntas que hoy no se le
+ocurren a nadie se contestan después sobre los mismos datos.
+
+**Cabecera de sesión.** La línea `session` lleva el `SimulationConfig` completo. Sin eso, dos
+testers con tuning distinto producen datos que no se pueden juntar.
+
+**Silencios.** Cada línea `cmd` trae `gapTicks`, el hueco desde el comando anterior. Si la
+gente teclea durante los diez segundos iniciales en que no pasa nada, el silencio se está
+leyendo como que el juego está roto.
+
+**Nada personal.** Id anónimo por sesión, sin nombre de usuario, sin rutas, sin nombre de
+máquina. El juego lo dice en pantalla al abrirse.
 
 ## Decisiones que M1 puede invalidar
 

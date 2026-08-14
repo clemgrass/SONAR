@@ -234,6 +234,7 @@ public partial class Main : Node
         if (_controller.Wave != _announcedWave)
         {
             _announcedWave = _controller.Wave;
+            _metrics.NoteWave(_announcedWave);
             Instrument($"— WAVE {_announcedWave} —");
             _recorder.WaveStarted(_announcedWave, snap.Tick, _controller.LiveEnemyCount);
         }

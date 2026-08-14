@@ -26,6 +26,17 @@ public sealed class SessionMetrics
     /// <summary>Duración de composición del último comando enviado.</summary>
     public double LastComposeSeconds { get; private set; }
 
+    /// <summary>
+    /// Oleada más alta alcanzada en toda la sesión. Es la respuesta a la pregunta 3 de M1
+    /// reducida a un número: cuántos contactos son demasiados.
+    /// </summary>
+    public int BestWave { get; private set; }
+
+    public void NoteWave(int wave)
+    {
+        if (wave > BestWave) BestWave = wave;
+    }
+
     public double AverageComposeSeconds =>
         _composeTimes.Count == 0 ? 0 : _composeTimes.Average();
 
@@ -73,6 +84,7 @@ public sealed class SessionMetrics
         file.StoreLine($"avg_compose_seconds,{Format(AverageComposeSeconds)}");
         file.StoreLine($"shots_fired,{ShotsFired}");
         file.StoreLine($"contacts_destroyed,{ContactsDestroyed}");
+        file.StoreLine($"best_wave,{BestWave}");
         file.StoreLine($"hit_rate,{Format(HitRate)}");
     }
 
