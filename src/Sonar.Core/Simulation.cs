@@ -195,7 +195,7 @@ public sealed class Simulation : ISimulation
 
                 contacts[c] = contact with { Alive = false };
                 events.Add(new ContactDestroyed(tick, contact.Id.Value,
-                    torpedo.Position, DestructionCause.DirectHit));
+                    torpedo.Position, DestructionCause.DirectHit, torpedo.Id.Value));
                 torpedoes.RemoveAt(t);
                 break;
             }
@@ -235,7 +235,8 @@ public sealed class Simulation : ISimulation
                 // jugador: el torpedo propio desaparecería en silencio y sólo se anunciaría
                 // la muerte del enemigo. El spec §4.6 exige confirmación de impacto propia
                 // e independiente del barrido, así que la detonación se emite también aquí.
-                events.Add(new TorpedoDetonated(tick, own.Position, HitSomething: true));
+                events.Add(new TorpedoDetonated(tick, own.Position, HitSomething: true,
+                    TorpedoId: own.Id.Value));
 
                 destroyed.Add(own.Id.Value);
                 destroyed.Add(enemy.Id.Value);
@@ -333,7 +334,7 @@ public sealed class Simulation : ISimulation
                 {
                     contacts[c] = contact with { Alive = false };
                     events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
-                        DestructionCause.Blast));
+                        DestructionCause.Blast, torpedo.Id.Value));
                     killed = true;
                 }
                 else if (distance < nearestSurvivor)
@@ -343,7 +344,7 @@ public sealed class Simulation : ISimulation
                 }
             }
 
-            events.Add(new TorpedoDetonated(tick, point, killed));
+            events.Add(new TorpedoDetonated(tick, point, killed, torpedo.Id.Value));
 
             // Casi-impacto: cerca como para ser intencional, lejos como para no destruir.
             // Base mecánica de la pista 2 (spec §4.10). Sin efecto en M1.

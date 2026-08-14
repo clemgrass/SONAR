@@ -20,9 +20,15 @@ public sealed record SweepCompleted(int Tick, int Revolution, int ReadingCount) 
 // --- Combate propio ---
 public sealed record TorpedoFired(int Tick, int TorpedoId, int BearingDegrees, char BandLetter)
     : GameEvent(Tick);
-public sealed record TorpedoDetonated(int Tick, Vec2 Position, bool HitSomething) : GameEvent(Tick);
-public sealed record ContactDestroyed(int Tick, int ContactId, Vec2 Position, DestructionCause Cause)
-    : GameEvent(Tick);
+public sealed record TorpedoDetonated(int Tick, Vec2 Position, bool HitSomething,
+    int TorpedoId = -1) : GameEvent(Tick);
+
+/// <summary>
+/// `TorpedoId` es el torpedo responsable, o -1 cuando no lo hubo — una defensa, por ejemplo.
+/// Sirve para unir un disparo con lo que le pasó al analizar la telemetría.
+/// </summary>
+public sealed record ContactDestroyed(int Tick, int ContactId, Vec2 Position,
+    DestructionCause Cause, int TorpedoId = -1) : GameEvent(Tick);
 
 /// <summary>
 /// Detonación que no destruyó nada pero cayó cerca de un contacto vivo. No tiene efecto en M1:
