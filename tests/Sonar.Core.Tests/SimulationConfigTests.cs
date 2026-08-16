@@ -99,6 +99,15 @@ public class SimulationConfigTests
     }
 
     [Fact]
+    public void Validate_RejectsNonPositiveFireStagger()
+    {
+        // Un stagger de cero recrea en silencio la andanada simultánea: todo el
+        // escalonamiento de NextFireTick colapsa al mismo tick.
+        var config = Valid() with { EnemyFireStaggerTicks = 0 };
+        Assert.Throws<ArgumentException>(config.Validate);
+    }
+
+    [Fact]
     public void Validate_RejectsNonPositiveEnemyReload()
     {
         var config = Valid() with { EnemyReloadTicks = 0 };

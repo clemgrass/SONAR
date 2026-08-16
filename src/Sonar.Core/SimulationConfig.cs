@@ -69,7 +69,11 @@ public sealed record SimulationConfig
         if (AmmoReserve < 0) throw Bad(nameof(AmmoReserve), "no puede ser negativo.");
         if (ReloadTicks <= 0) throw Bad(nameof(ReloadTicks), "debe ser mayor a cero.");
         if (EnemyFireIntervalTicks <= 0) throw Bad(nameof(EnemyFireIntervalTicks), "debe ser mayor a cero.");
-        if (EnemyFireStaggerTicks < 0) throw Bad(nameof(EnemyFireStaggerTicks), "no puede ser negativo.");
+
+        // Cero no es sólo inútil, es peligroso: recrea en silencio el defecto de la andanada
+        // simultánea (§1.1) que WaveDirector arregla escalonando NextFireTick. Con stagger
+        // en cero todo el escalonamiento colapsa y una oleada entera dispara en el mismo tick.
+        if (EnemyFireStaggerTicks <= 0) throw Bad(nameof(EnemyFireStaggerTicks), "debe ser mayor a cero.");
         if (EnemyReloadTicks <= 0) throw Bad(nameof(EnemyReloadTicks), "debe ser mayor a cero.");
 
         // El enemigo nunca puede ciclar más rápido que el jugador. Es la invariante que

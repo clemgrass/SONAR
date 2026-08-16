@@ -226,4 +226,32 @@ public class WaveDirectorTests
                 $"{distinct} tiempos de disparo distintos.");
         }
     }
+
+    [Fact]
+    public void StaggerSpanIsBoundedNotLinear()
+    {
+        // El escalonamiento garantiza separación en el tick de entrada; no está pensado
+        // para marcar el ritmo. Las oleadas 1 a 4 (1, 2, 4 y 8 contactos) quedan
+        // idénticas al valor sin techo: el reparto completo de la oleada 4 es
+        // 7 x 300 = 2100, exactamente el techo. De la oleada 5 en adelante (16
+        // contactos) el reparto sin techo excedería el techo y por eso se recorta.
+        var log = RunClearingInstantly(New(), 20000);
+
+        var wave4 = log[3].Spawned; // oleada 4: 8 contactos
+        Assert.Equal(8, wave4.Count);
+        var span4 = wave4.Max(c => c.NextFireTick) - wave4.Min(c => c.NextFireTick);
+        Assert.Equal(2100, span4);
+
+        var wave5 = log[4].Spawned; // oleada 5: 16 contactos
+        Assert.Equal(16, wave5.Count);
+        var span5 = wave5.Max(c => c.NextFireTick) - wave5.Min(c => c.NextFireTick);
+        Assert.True(span5 <= 2100,
+            $"El reparto de la oleada 5 ({span5} ticks) supera el techo de 2100.");
+
+        // Control positivo: sin techo, el reparto de la oleada 5 sería 15 x 300 = 4500.
+        // Que el resultado real sea menor confirma que el techo de verdad actuó acá y no
+        // que 16 contactos coincidieron por casualidad debajo del límite.
+        Assert.True(span5 < 15 * 300,
+            "El reparto de la oleada 5 coincide con el valor sin techo; el techo no actuó.");
+    }
 }

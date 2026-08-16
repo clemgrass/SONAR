@@ -42,6 +42,18 @@ public sealed class WaveDirector
     /// </summary>
     private const int MaxWaveSize = 512;
 
+    /// <summary>
+    /// Techo del reparto de un escalonamiento completo. El escalonamiento existe para
+    /// garantizar que una oleada no dispare toda en el mismo tick — no para marcar el ritmo.
+    /// Sin techo, el incremento por contacto escala con el tamaño de la oleada y el último
+    /// de una oleada grande queda armado decenas de minutos después de entrar, o sea nunca.
+    ///
+    /// El valor está elegido para que las oleadas 1 a 4 queden idénticas a como estaban:
+    /// la 4 son ocho contactos y su reparto completo son 7 x 300 = 2100 ticks, justo el
+    /// techo. Sólo recorta de la oleada 5 en adelante, que es territorio sin medir.
+    /// </summary>
+    private const int MaxStaggerSpanTicks = 2100;
+
     // Velocidad de cierre NETA deseada, ya descontada la deriva del mundo. La oleada 1 casi
     // no se mueve para que un jugador lento igual alcance a disparar.
     private const double ClosingBase = 0.006;
@@ -116,6 +128,11 @@ public sealed class WaveDirector
         var sector = 360.0 / count;
         var offset = _random.NextDouble() * 360.0;
 
+        // Reparto acotado: separación garantizada, costo acotado.
+        var step = count > 1
+            ? Math.Max(1, Math.Min((count - 1) * _config.EnemyFireStaggerTicks, MaxStaggerSpanTicks) / (count - 1))
+            : 0;
+
         for (var i = 0; i < count; i++)
         {
             var jitter = (_random.NextDouble() - 0.5) * sector * 0.5;
@@ -143,7 +160,7 @@ public sealed class WaveDirector
                 // en vez de sostenida.
                 NextFireTick = spawnTick
                                + _config.EnemyFireIntervalTicks
-                               + i * _config.EnemyFireStaggerTicks,
+                               + i * step,
             });
         }
 
