@@ -23,11 +23,22 @@ public class StaleAimTests
     // que estos tests detecten tanto el envejecimiento como su compensación.
     private static readonly Vec2 StartPosition = new(0.30, -0.85);
 
-    private static Contact Enemy(Personality? personality, int lastFixTick) => new()
+    // [Defecto de plan corregido, tarea 12] Con el gate de FiringRadius conectado, un
+    // contacto viejo (lastFixTick = -600) mide su alcance contra una estimación que se
+    // corrió hacia atrás en el rumbo, y eso puede empujarlo fuera de su radio de
+    // compromiso incluso partiendo de StartPosition. Le pasa al PICKET (su radio es 0.95 y
+    // la estimación corrida lo deja justo por fuera) y le pasa siempre al HUNTER (compensa
+    // del todo, así que su centro es el origen exacto y su radio, 0.60, es el más chico del
+    // roster). Estos tests miden dirección de puntería, no alcance, así que la corrección es
+    // acercar el contacto — no sacarle la personalidad, que es justo lo que están probando.
+    // Se queda fuera del eje por la misma razón que StartPosition.
+    private static readonly Vec2 CloseStartPosition = new(0.15, -0.48);
+
+    private static Contact Enemy(Personality? personality, int lastFixTick, Vec2? position = null) => new()
     {
         Id = new ContactId(1),
         Kind = ContactKind.Enemy,
-        Position = StartPosition,
+        Position = position ?? StartPosition,
         Velocity = Vec2.Zero,
         Alive = true,
         NextFireTick = 0,
@@ -66,7 +77,8 @@ public class StaleAimTests
         // Con el submarino en movimiento, un contacto viejo envejece hacia atrás en el rumbo.
         // lastFixTick negativo = "te escuchó hace 600 ticks", diez segundos de antigüedad.
         var sim = TestWorld.Moving();
-        sim.SetContacts(new[] { Enemy(PersonalityCatalog.Picket, lastFixTick: -600) });
+        sim.SetContacts(new[]
+            { Enemy(PersonalityCatalog.Picket, lastFixTick: -600, position: CloseStartPosition) });
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);
@@ -79,9 +91,13 @@ public class StaleAimTests
     [Fact]
     public void TheHunterCompensatesAndStillAimsAtThePlayer()
     {
-        // Misma antigüedad que el test anterior, pero AimLead = 1.
+        // Misma antigüedad y misma posición cercana que el test anterior, pero AimLead = 1.
+        // Al HUNTER la posición cercana le hace falta siempre, no sólo por la antigüedad:
+        // compensa la deriva del todo, así que mide su alcance contra el origen exacto, y su
+        // radio de compromiso —0.60— es el más chico del roster.
         var sim = TestWorld.Moving();
-        sim.SetContacts(new[] { Enemy(PersonalityCatalog.Hunter, lastFixTick: -600) });
+        sim.SetContacts(new[]
+            { Enemy(PersonalityCatalog.Hunter, lastFixTick: -600, position: CloseStartPosition) });
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);

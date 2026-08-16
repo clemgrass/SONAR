@@ -18,7 +18,7 @@ public static class PersonalityCatalog
     {
         Name = "PICKET",
         RadiusLoaded = 0.90, RadiusEmpty = 0.90,
-        OrbitRate = 0.010, FiringRadius = 0.90,
+        OrbitRate = 0.010, FiringRadius = 0.95,
         AimLead = 0.0, AimJitter = 0.0,
         HesitationMinTicks = 240, HesitationMaxTicks = 720,   // 4–12 s
         Rams = false,
@@ -30,7 +30,7 @@ public static class PersonalityCatalog
     {
         Name = "STALKER",
         RadiusLoaded = 0.55, RadiusEmpty = 0.85,
-        OrbitRate = 0.003, FiringRadius = 0.55,
+        OrbitRate = 0.003, FiringRadius = 0.62,
         AimLead = 0.0, AimJitter = 0.0,
         HesitationMinTicks = 120, HesitationMaxTicks = 360,   // 2–6 s
         Rams = false,
@@ -55,7 +55,7 @@ public static class PersonalityCatalog
     {
         Name = "GOAD",
         RadiusLoaded = 0.60, RadiusEmpty = 0.60,
-        OrbitRate = 0.006, FiringRadius = 0.60,
+        OrbitRate = 0.006, FiringRadius = 0.66,
         AimLead = 0.0, AimJitter = 0.055,
         HesitationMinTicks = 30, HesitationMaxTicks = 120,    // 0.5–2 s
         Rams = false,

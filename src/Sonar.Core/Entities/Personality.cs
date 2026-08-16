@@ -24,7 +24,18 @@ public sealed record Personality
     /// <summary>Componente tangencial del movimiento. Cero va derecho, alto rodea.</summary>
     public required double OrbitRate { get; init; }
 
-    /// <summary>Distancia desde la que se decide a disparar. Cero significa que nunca dispara.</summary>
+    /// <summary>
+    /// Distancia desde la que se decide a disparar. Cero significa que nunca dispara.
+    ///
+    /// <b>Tiene que quedar por encima de <c>RadiusLoaded</c>, nunca igual.</b> El gobierno
+    /// del movimiento (<c>SteerContacts</c>) integra <c>radial = outward * (preferred -
+    /// distance)</c>: eso converge al radio preferido de forma asintótica <i>desde arriba</i>
+    /// y nunca lo cruza. Si <c>FiringRadius</c> valiera lo mismo que <c>RadiusLoaded</c>, la
+    /// condición "distancia ≤ radio de compromiso" no se cumpliría jamás y la personalidad
+    /// no dispararía nunca — la misma trampa que dejó este campo muerto la primera vez. No es
+    /// obvio leyendo cualquiera de los dos números por separado; hay que dejarlo escrito para
+    /// quien reajuste el roster.
+    /// </summary>
     public required double FiringRadius { get; init; }
 
     /// <summary>

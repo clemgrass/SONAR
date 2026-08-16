@@ -167,6 +167,17 @@ public sealed class Simulation : ISimulation
             if (state.Tick < contact.NextFireTick) continue;
             if (contact.Position.Length > 1.0) continue;
 
+            // Fuera de su rango de compromiso no dispara. Para el RAM ese rango es cero, que
+            // es como se expresa "no dispara nunca": su amenaza se mide en distancia, no en
+            // torpedos. Se compara contra su estimación y no contra el origen, por coherencia
+            // con el gobierno del movimiento — un enemigo decide con lo que cree, no con lo
+            // que es.
+            if (contact.Personality is not null)
+            {
+                var range = (contact.Position - EstimatedCentre(contact, state.Tick, worldDrift, dt)).Length;
+                if (range > contact.Personality.FiringRadius) continue;
+            }
+
             // Uno a la vez: hasta que el suyo se resuelva —impacte, lo intercepten o salga
             // del arena— este enemigo no vuelve a disparar.
             if (torpedoes.Any(t => t.Side == TorpedoSide.Enemy
