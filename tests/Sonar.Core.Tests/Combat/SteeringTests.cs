@@ -24,6 +24,14 @@ public class SteeringTests
         Personality = personality,
     };
 
+    /// <summary>
+    /// Un PICKET ya viejo: veinte segundos de antigüedad (a 60 Hz) puestos de entrada, para
+    /// que la estimación ya esté desplazada en el tick cero y no haga falta esperar a que
+    /// se acumule durante la corrida.
+    /// </summary>
+    private static Contact StaleAt(double radius) =>
+        At(radius, PersonalityCatalog.Picket) with { LastFixTick = -1200 };
+
     [Fact]
     public void AContactWithoutPersonalityKeepsItsFixedVelocity()
     {
@@ -108,5 +116,39 @@ public class SteeringTests
             Assert.True(sim.State.Contacts[0].Velocity.Length <= config.EnemyTorpedoSpeed / 2.0 + 1e-9,
                 "el techo de velocidad se rompió");
         }
+    }
+
+    [Fact]
+    public void ASteeredContactOrbitsItsEstimateAndNotTheOrigin()
+    {
+        // Un PICKET tiene los dos radios en 0.90, así que puesto exactamente a 0.90 del
+        // origen se queda quieto SI el centro fuera el origen: el término radial es cero y
+        // sólo actúa el tangencial, que no cambia la distancia. Que se mueva es la prueba
+        // de que está orbitando otra cosa.
+        var drifting = TestWorld.SteamingNorth(0.012);
+        drifting.SetContacts(new[] { StaleAt(0.90) });
+        drifting.Tick(new Command[] { new ToggleSonarCommand() });   // silencio: el contacto no se refresca
+        for (var i = 0; i < 300; i++) drifting.Tick(NoCommands);
+
+        var moved = Math.Abs(drifting.State.Contacts[0].Position.Length - 0.90);
+
+        // Control: el MISMO escenario sin deriva. Ahí la estimación sí es el origen por
+        // mucho que envejezca, y el contacto tiene que quedarse clavado en su radio.
+        var still = TestWorld.Still();
+        still.SetContacts(new[] { StaleAt(0.90) });
+        still.Tick(new Command[] { new ToggleSonarCommand() });
+        for (var i = 0; i < 300; i++) still.Tick(NoCommands);
+
+        var held = Math.Abs(still.State.Contacts[0].Position.Length - 0.90);
+
+        // El techo real, medido: sin deriva el radio converge a 0.9000009... — el término
+        // tangencial no es perfectamente ortogonal en tiempo discreto y deja un residuo del
+        // orden de 1e-6. 1e-6 a secas quedaba a un 8% de ese valor real, demasiado cerca
+        // para confiar en él fuera de esta máquina (el contrato sólo promete reproducibilidad
+        // en la misma máquina, no bit a bit entre plataformas — ver AGENT_CONTRACT.md §3).
+        // 1e-5 da un orden de magnitud de margen y sigue siendo tres órdenes más chico que el
+        // 0.01 de abajo, así que sigue distinguiendo "quieto" de "orbitando otra cosa".
+        Assert.True(held < 1e-5, $"sin deriva el PICKET tenía que mantener su radio, y se movió {held:F8}");
+        Assert.True(moved > 0.01, $"con deriva tenía que orbitar la estimación, y se movió sólo {moved:F6}");
     }
 }
