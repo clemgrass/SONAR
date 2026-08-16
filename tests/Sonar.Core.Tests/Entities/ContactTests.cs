@@ -51,4 +51,24 @@ public class ContactTests
         Assert.Equal(ContactKind.Inert, wreck.Kind);
         Assert.True(wreck.Alive);
     }
+
+    [Fact]
+    public void AContactWithoutPersonalityKeepsTheOldShape()
+    {
+        // Los campos nuevos son opcionales a propósito: un contacto sin personalidad se
+        // comporta exactamente como antes, y por eso los tests que ya existían siguen
+        // valiendo sin tocarlos.
+        var contact = new Contact
+        {
+            Id = new ContactId(1),
+            Kind = ContactKind.Enemy,
+            Position = new Vec2(0.0, -0.5),
+            Velocity = Vec2.Zero,
+            Alive = true,
+            NextFireTick = 100,
+        };
+
+        Assert.Null(contact.Personality);
+        Assert.Equal(0, contact.LastFixTick);
+    }
 }

@@ -29,6 +29,21 @@ public sealed record Contact
     /// <summary>Tick en el que este contacto puede volver a disparar. Solo aplica a Enemy.</summary>
     public required int NextFireTick { get; init; }
 
+    /// <summary>
+    /// Tick en el que este enemigo escuchó al jugador por última vez. Es <b>todo</b> lo que
+    /// sabe de él: como el submarino está clavado en el origen y el mundo deriva alrededor,
+    /// una posición vieja envejece sola hacia atrás en el rumbo del jugador. No hace falta
+    /// simular una creencia; la deriva ya la calcula.
+    /// </summary>
+    public int LastFixTick { get; init; }
+
+    /// <summary>
+    /// Su carácter, o null. <b>Null significa el comportamiento de siempre</b>: velocidad
+    /// fija y puntería perfecta al origen. Es lo que permite que la IA nueva sea opt-in
+    /// contacto por contacto y que los tests anteriores sigan valiendo sin tocarlos.
+    /// </summary>
+    public Personality? Personality { get; init; }
+
     public static Contact CreateInert(ContactId id, Vec2 position) => new()
     {
         Id = id,
