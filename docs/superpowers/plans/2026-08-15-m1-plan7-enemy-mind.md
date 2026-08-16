@@ -58,16 +58,10 @@ En `tests/Sonar.Core.Tests/SimulationConfigLoaderTests.cs`, agregar al final de 
         Assert.True(config.EnemyReloadTicks > config.ReloadTicks * 3,
             "el enemigo tiene que seguir ciclando mucho más lento que el jugador");
     }
-
-    /// Sube desde el directorio del binario de test hasta encontrar el .sln.
-    private static string RepoRoot()
-    {
-        var dir = System.AppContext.BaseDirectory;
-        while (dir is not null && !System.IO.File.Exists(System.IO.Path.Combine(dir, "Sonar.sln")))
-            dir = System.IO.Directory.GetParent(dir)?.FullName;
-        return dir ?? throw new System.IO.DirectoryNotFoundException("No se encontró Sonar.sln.");
-    }
 ```
+
+`RepoRoot()` **ya existe** en esa clase — lo usa `WorkingConfigOnDisk_IsValid`. Reusarlo, no
+escribir otro: dos métodos con la misma firma en la misma clase no compilan.
 
 - [ ] **Step 2: Correrlo y verlo fallar**
 
@@ -104,19 +98,34 @@ Y agregar el método a la clase, junto a `MissionClock`:
     /// en la santabárbara, dos números sin relación separados por una barra que inventaba una.
     /// Los puntos dicen cuántos tubos hay listos sin obligar a leer un número.
     /// </summary>
-    private static string Tubes(int loaded)
+    private string Tubes(int loaded)
     {
         var full = new string('*', loaded);
-        var empty = new string('.', System.Math.Max(0, MagazineSize - loaded));
+        var empty = new string('.', System.Math.Max(0, _magazineSize - loaded));
         return $"tubes {full}{empty}";
     }
 ```
 
-Y la constante junto a las otras del tope del archivo:
+La capacidad **se lee de la configuración, no se escribe a mano**. `config/simulation.working.json`
+existe justamente para que ese número se pueda retocar sin tocar código; una constante local
+volvería a producir el mismo bug que esta tarea viene a arreglar —dígitos que no significan lo
+que parecen— pero en un sitio donde ningún test lo vería, porque hoy los dos valores coinciden.
+
+`_Ready()` ya tiene el patrón: copia `config.TickDurationSeconds` a un campo para que sobreviva
+al ámbito local. Hacer lo mismo aquí:
 
 ```csharp
-    private const int MagazineSize = 3;
+    private int _magazineSize;
 ```
+
+y en `_Ready()`, junto a la línea de `_tickDuration`:
+
+```csharp
+        _magazineSize = config.MagazineSize;
+```
+
+No plumbear la capacidad por `GameController` ni `WorldSnapshot`: ninguno la expone hoy y sería
+un cambio mucho más grande que esta tarea.
 
 - [ ] **Step 6: Verificar que el juego compila y arranca**
 
