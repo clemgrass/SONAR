@@ -29,14 +29,22 @@ public class NoiseTests
     [Fact]
     public void SilenceLetsTheFixGoStale()
     {
-        var sim = TestWorld.Still();
+        var config = TestWorld.Config();
+        var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { FarEnemy(1) });
 
-        for (var i = 0; i < 30; i++) sim.Tick(NoCommands);
+        // Control positivo primero: hay que ganarse un contacto de verdad antes de callarse.
+        // Sin esto el test compara el cero del constructor contra sí mismo y pasa aunque la
+        // fase no escriba nunca — que es exactamente como estaba escrito antes.
+        var ticksPerRevolution = (int)Math.Ceiling(config.SweepPeriodSeconds / config.TickDurationSeconds);
+        for (var i = 0; i < ticksPerRevolution + 2; i++) sim.Tick(NoCommands);
+        Assert.True(sim.State.Contacts[0].LastFixTick > 0,
+            "el barrido tenía que haber delatado la posición antes de que empiece el silencio");
 
-        // El sonar arranca corriendo, así que hay que apagarlo para que haya silencio real.
+        // Ahora sí: se apaga el haz y no se hace ruido de ninguna clase.
         sim.Tick(new Command[] { new ToggleSonarCommand() });
         var before = sim.State.Contacts[0].LastFixTick;
+
         for (var i = 0; i < 300; i++) sim.Tick(NoCommands);
 
         Assert.Equal(before, sim.State.Contacts[0].LastFixTick);

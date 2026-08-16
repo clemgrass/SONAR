@@ -112,7 +112,7 @@ public sealed class Simulation : ISimulation
         var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
         // 10b · Qué delata al jugador
-        contacts = RefreshEnemyFixes(contacts, events, state.Tick);
+        RefreshEnemyFixes(contacts, events, state.Tick);
 
         // 11 · Recarga
         sub = AdvanceReload(sub, state.Tick, events);
@@ -641,8 +641,13 @@ public sealed class Simulation : ISimulation
     /// El disparo enemigo (fase 5) usa entonces los contactos del tick anterior: un tick de
     /// desfase, imperceptible, y a cambio el orden queda sin ambigüedad.
     /// </summary>
-    private List<Contact> RefreshEnemyFixes(List<Contact> contacts, List<GameEvent> events, int tick)
+    private void RefreshEnemyFixes(List<Contact> contacts, List<GameEvent> events, int tick)
     {
+        // Sólo ve lo que ya se emitió en las fases 1–10: esta fase corre en el punto 10b,
+        // así que cualquier evento emitido en la fase 11 en adelante (por ejemplo
+        // ReloadCompleted) queda invisible acá. Y como `events` se reconstruye entero en
+        // cada tick, no queda tarde: queda perdido sin más. Si se agrega una fuente de
+        // ruido nueva, hay que verificar en qué fase se emite, no sólo sumarla a la lista.
         var loud = events.Any(e => e is SweepCompleted
                                 or TorpedoFired
                                 or ReloadStarted
@@ -658,7 +663,5 @@ public sealed class Simulation : ISimulation
             var close = contact.Position.Length <= _config.PassiveHearingRadius;
             if (loud || close) contacts[i] = contact with { LastFixTick = tick };
         }
-
-        return contacts;
     }
 }

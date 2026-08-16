@@ -728,14 +728,22 @@ public class NoiseTests
     [Fact]
     public void SilenceLetsTheFixGoStale()
     {
-        var sim = TestWorld.Still();
+        var config = TestWorld.Config();
+        var sim = TestWorld.Still(config);
         sim.SetContacts(new[] { FarEnemy(1) });
 
-        for (var i = 0; i < 30; i++) sim.Tick(NoCommands);
+        // Control positivo primero: hay que ganarse un contacto de verdad antes de callarse.
+        // Sin esto el test compara el cero del constructor contra sí mismo y pasa aunque la
+        // fase no escriba nunca.
+        var ticksPerRevolution = (int)Math.Ceiling(config.SweepPeriodSeconds / config.TickDurationSeconds);
+        for (var i = 0; i < ticksPerRevolution + 2; i++) sim.Tick(NoCommands);
+        Assert.True(sim.State.Contacts[0].LastFixTick > 0,
+            "el barrido tenía que haber delatado la posición antes de que empiece el silencio");
 
-        // El sonar arranca corriendo, así que hay que apagarlo para que haya silencio real.
+        // Ahora sí: se apaga el haz y no se hace ruido de ninguna clase.
         sim.Tick(new Command[] { new ToggleSonarCommand() });
         var before = sim.State.Contacts[0].LastFixTick;
+
         for (var i = 0; i < 300; i++) sim.Tick(NoCommands);
 
         Assert.Equal(before, sim.State.Contacts[0].LastFixTick);
@@ -845,8 +853,16 @@ En `src/Sonar.Core/Simulation.cs`, agregar el método junto a las otras fases:
     /// El disparo enemigo (fase 5) usa entonces los contactos del tick anterior: un tick de
     /// desfase, imperceptible, y a cambio el orden queda sin ambigüedad.
     /// </summary>
-    private List<Contact> RefreshEnemyFixes(List<Contact> contacts, List<GameEvent> events, int tick)
+    private void RefreshEnemyFixes(List<Contact> contacts, List<GameEvent> events, int tick)
     {
+        // `loud` sólo ve los eventos de las fases 1 a 10. Es correcto hoy, y es justo por eso
+        // que la fuente de recarga es ReloadStarted (fase 1) y no ReloadCompleted (fase 11):
+        // la segunda sería estructuralmente inalcanzable desde acá.
+        //
+        // Cualquier fuente de ruido nueva tiene que emitirse en la fase 10b o antes. Una que
+        // se emita después no llega tarde: no cuenta nunca, porque la lista de eventos se
+        // reconstruye cada tick. Agregar un tipo a esta lista obliga a verificar dónde se
+        // dispara, no sólo a agregarlo.
         var loud = events.Any(e => e is SweepCompleted
                                 or TorpedoFired
                                 or ReloadStarted
@@ -862,10 +878,13 @@ En `src/Sonar.Core/Simulation.cs`, agregar el método junto a las otras fases:
             var close = contact.Position.Length <= _config.PassiveHearingRadius;
             if (loud || close) contacts[i] = contact with { LastFixTick = tick };
         }
-
-        return contacts;
     }
 ```
+
+Es `void` y muta en el sitio, como sus cuatro hermanas que trabajan sobre listas
+(`ResolveDirectHits`, `ResolveTorpedoCollisions`, `ResolveDefenseCollisions`, `ResolveRunOuts`).
+Devolver la lista sería la forma que este archivo reserva para las fases que entregan un valor
+nuevo e inmutable —`AdvanceReload`, `AdvanceSweepAndRecord`— y aquí mentiría sobre lo que hace.
 
 Y llamarla en `Tick`, justo después de la fase 10:
 
@@ -874,7 +893,7 @@ Y llamarla en `Tick`, justo después de la fase 10:
         var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
         // 10b · Qué delata al jugador
-        contacts = RefreshEnemyFixes(contacts, events, state.Tick);
+        RefreshEnemyFixes(contacts, events, state.Tick);
 ```
 
 - [ ] **Step 5: Correr los tests**
