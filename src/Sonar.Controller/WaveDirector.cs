@@ -71,6 +71,35 @@ public sealed class WaveDirector
     /// </summary>
     private const double ClosingCeilingOfTorpedoSpeed = 0.5;
 
+    /// <summary>
+    /// La composición de una oleada. La dificultad deja de subir duplicando la cantidad
+    /// —que es lo que convertía la oleada 4 en una pared— y pasa a subir cambiando la mezcla,
+    /// que es lo que gobierna cuántos torpedos pueden estar en el agua a la vez.
+    ///
+    /// El contacto `i` de una oleada de `count` recibe la personalidad `i % receta.Count`.
+    /// </summary>
+    private static IReadOnlyList<Personality> RecipeFor(int wave) => wave switch
+    {
+        1 => new[] { PersonalityCatalog.Stalker },
+        2 => new[] { PersonalityCatalog.Stalker, PersonalityCatalog.Picket },
+        3 => new[]
+        {
+            PersonalityCatalog.Stalker, PersonalityCatalog.Picket,
+            PersonalityCatalog.Stalker, PersonalityCatalog.Goad,
+        },
+        4 => new[]
+        {
+            PersonalityCatalog.Stalker, PersonalityCatalog.Picket,
+            PersonalityCatalog.Goad, PersonalityCatalog.Ram,
+        },
+        _ => new[]
+        {
+            PersonalityCatalog.Stalker, PersonalityCatalog.Picket,
+            PersonalityCatalog.Goad, PersonalityCatalog.Ram,
+            PersonalityCatalog.Hunter,
+        },
+    };
+
     private readonly SimulationConfig _config;
     private readonly IRandomSource _random;
     private readonly Vec2 _worldDrift;
@@ -121,6 +150,7 @@ public sealed class WaveDirector
         var ceiling = _config.EnemyTorpedoSpeed * ClosingCeilingOfTorpedoSpeed;
         var closing = Math.Min(ClosingBase + (Wave - 1) * ClosingStep, ceiling);
         var spawned = new List<Contact>(count);
+        var recipe = RecipeFor(Wave);
 
         // Un sector por contacto, con temblor acotado a la mitad central del sector. Eso
         // garantiza una separación mínima de medio sector sin dejar las entradas repartidas
@@ -161,6 +191,8 @@ public sealed class WaveDirector
                 NextFireTick = spawnTick
                                + _config.EnemyFireIntervalTicks
                                + i * step,
+                Personality = recipe[i % recipe.Count],
+                LastFixTick = spawnTick,
             });
         }
 

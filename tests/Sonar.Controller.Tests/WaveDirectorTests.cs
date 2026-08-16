@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Sonar.Core;
@@ -274,5 +275,46 @@ public class WaveDirectorTests
                     $"En la oleada que entra en {tick}, el contacto {byId[i].Id.Value} " +
                     $"se arma antes que el {byId[i - 1].Id.Value}.");
         }
+    }
+
+    [Fact]
+    public void EverySpawnedContactHasAPersonality()
+    {
+        var all = RunClearingInstantly(New(), 20000).SelectMany(e => e.Spawned);
+        Assert.All(all, c => Assert.NotNull(c.Personality));
+    }
+
+    [Fact]
+    public void TheFirstWaveIsASingleStalker()
+    {
+        // La oleada 1 enseña el ciclo acercarse-disparar-abrirse. Si fuera otra cosa, el
+        // jugador aprende otra lección.
+        var log = RunClearingInstantly(New(), 20000);
+        var first = Assert.Single(log[0].Spawned);
+        Assert.Equal("STALKER", first.Personality!.Name);
+    }
+
+    [Fact]
+    public void TheHunterDoesNotAppearBeforeWaveFive()
+    {
+        var log = RunClearingInstantly(New(), 20000);
+
+        for (var wave = 0; wave < Math.Min(4, log.Count); wave++)
+            Assert.DoesNotContain(log[wave].Spawned, c => c.Personality!.Name == "HUNTER");
+
+        // Control positivo: si nunca apareciera, el test de arriba sería vacuo.
+        var everything = log.SelectMany(e => e.Spawned);
+        Assert.Contains(everything, c => c.Personality!.Name == "HUNTER");
+    }
+
+    [Fact]
+    public void EveryContactStartsWithAFreshFixSoItDoesNotFireBlindOnArrival()
+    {
+        // Sin esto, un contacto recién aparecido tendría LastFixTick = 0 y una antigüedad
+        // enorme desde el primer tick: nacería apuntando a un punto absurdo.
+        var log = RunClearingInstantly(New(), 20000);
+        foreach (var (tick, spawned) in log)
+        foreach (var contact in spawned)
+            Assert.Equal(tick, contact.LastFixTick);
     }
 }
