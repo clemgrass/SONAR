@@ -145,8 +145,8 @@ public sealed class Simulation : ISimulation
     /// La asimetría es deliberada. Con ambos lados al mismo reloj el jugador quedaba
     /// encadenado a esquivar torpedos sin ventana para calcular un disparo propio.
     ///
-    /// `EnemyFireIntervalTicks` ya no gobierna la cadencia: sólo lo usa ContactSpawner para
-    /// decidir cuándo un contacto recién aparecido queda armado por primera vez.
+    /// `EnemyFireIntervalTicks` no gobierna la cadencia: sólo lo usa el WaveDirector para
+    /// decidir cuánto tarda en armarse un contacto recién aparecido.
     /// </summary>
     private WorldState FireEnemyTorpedoes(
         WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)

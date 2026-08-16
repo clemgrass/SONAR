@@ -79,14 +79,27 @@ public class DeterminismTests
             [300] = new Command[] { new FireCommand(new TargetCoordinate(new Bearing(270), new Band(4))) },
         };
 
-    private static IEnumerable<Contact> CombatContacts()
+    private static IEnumerable<Contact> CombatContacts() => new[]
     {
-        var spawner = new ContactSpawner(TestWorld.Config());
-        return spawner.SpawnEnemies(
-            spawnTick: 0, firstId: 200,
-            positions: new[] { new Vec2(0.0, -0.75), new Vec2(0.70, 0.20), new Vec2(-0.60, 0.40) },
-            velocities: new[] { new Vec2(0.02, 0.05), new Vec2(-0.06, 0.01), new Vec2(0.04, -0.03) });
-    }
+        new Contact
+        {
+            Id = new ContactId(200), Kind = ContactKind.Enemy,
+            Position = new Vec2(0.0, -0.75), Velocity = new Vec2(0.02, 0.05),
+            Alive = true, NextFireTick = 420,
+        },
+        new Contact
+        {
+            Id = new ContactId(201), Kind = ContactKind.Enemy,
+            Position = new Vec2(0.70, 0.20), Velocity = new Vec2(-0.06, 0.01),
+            Alive = true, NextFireTick = 490,
+        },
+        new Contact
+        {
+            Id = new ContactId(202), Kind = ContactKind.Enemy,
+            Position = new Vec2(-0.60, 0.40), Velocity = new Vec2(0.04, -0.03),
+            Alive = true, NextFireTick = 560,
+        },
+    };
 
     [Fact]
     public void CombatScenario_IsReproducibleTickByTick()

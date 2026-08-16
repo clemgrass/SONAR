@@ -254,4 +254,24 @@ public class WaveDirectorTests
         Assert.True(span5 < 15 * 300,
             "El reparto de la oleada 5 coincide con el valor sin techo; el techo no actuó.");
     }
+
+    [Fact]
+    public void WithinAWaveTheLowestIdIsTheFirstArmed()
+    {
+        // Los ids, el sector de marcación y el escalonamiento salen todos del mismo índice
+        // del bucle, así que sólo son coherentes entre sí mientras eso siga siendo cierto.
+        // Y la telemetría anota ids: quien lea veinte sesiones va a suponer que el contacto
+        // 100 entró y se armó antes que el 101. Si eso deja de valer, el análisis queda mal
+        // sin que nada lo delate.
+        var log = RunClearingInstantly(New(), 20000);
+
+        foreach (var (tick, spawned) in log)
+        {
+            var byId = spawned.OrderBy(c => c.Id.Value).ToArray();
+            for (var i = 1; i < byId.Length; i++)
+                Assert.True(byId[i].NextFireTick > byId[i - 1].NextFireTick,
+                    $"En la oleada que entra en {tick}, el contacto {byId[i].Id.Value} " +
+                    $"se arma antes que el {byId[i - 1].Id.Value}.");
+        }
+    }
 }
