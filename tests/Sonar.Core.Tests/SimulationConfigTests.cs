@@ -86,6 +86,20 @@ public class SimulationConfigTests
     }
 
     [Fact]
+    public void Validate_RejectsPassiveHearingRadiusAtOrBelowDeadZone()
+    {
+        // Todo lo que está lo bastante cerca como para matar por embestida tiene que
+        // estar lo bastante cerca como para oír; si no, un enemigo encima del casco
+        // podría seguir sordo.
+        var below = Valid() with { PassiveHearingRadius = 0.05 };
+        Assert.Throws<ArgumentException>(below.Validate);
+
+        // Caso límite: igual al radio de zona muerta también debe fallar, el chequeo es <=.
+        var equal = Valid() with { PassiveHearingRadius = Valid().DeadZoneRadius };
+        Assert.Throws<ArgumentException>(equal.Validate);
+    }
+
+    [Fact]
     public void Validate_RejectsNonIncreasingBandRadii()
     {
         var config = Valid() with { BandOuterRadii = new[] { 0.28, 0.20, 0.64 } };

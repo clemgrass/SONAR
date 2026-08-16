@@ -120,6 +120,14 @@ public sealed record SimulationConfig
             throw Bad(nameof(SubHitRadius),
                 $"({SubHitRadius}) debe ser menor al radio de zona muerta ({DeadZoneRadius}).");
 
+        // Todo lo que está lo bastante cerca como para matar por embestida tiene que estar
+        // lo bastante cerca como para oír. Como arriba ya se exige SubHitRadius < DeadZoneRadius,
+        // este piso lo garantiza por transitividad: un enemigo encima del casco nunca puede
+        // estar sordo, que sería justo lo contrario de "acercarse es la forma de apuntar".
+        if (PassiveHearingRadius <= DeadZoneRadius)
+            throw Bad(nameof(PassiveHearingRadius),
+                $"({PassiveHearingRadius}) debe superar el radio de zona muerta ({DeadZoneRadius}).");
+
         // Delega la validación de la geometría de bandas, que ya la implementa.
         BuildBandLayout();
 
