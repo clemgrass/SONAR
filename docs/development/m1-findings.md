@@ -91,3 +91,58 @@ velocidad del propio torpedo cerca de la oleada 5 y los cascos alcanzaban a sus 
 Las oleadas 1 y 2 quedan idénticas, que son las que enseñan a jugar.
 
 - [ ] Pendiente de playtest: ¿la ventana entre disparos enemigos alcanza para componer un tiro?
+
+### 2026-08-16 — plan 7: la mente del enemigo
+
+Once tareas. El enemigo pasa de "apunta al origen y dispara" a tener personalidad como dato,
+oír al jugador en vez de saberlo siempre, apuntar a una estimación envejecida, gobernar su
+movimiento hacia un radio preferido y dudar antes de tirar. 336 tests.
+
+**El baseline sin input se movió mucho, y es bimodal.** Cinco semillas, jugando la demo tal
+como se envía y sin escribir un solo comando después de START:
+
+| Semilla | Muerte | Disparos enemigos | Impactos | Acierto |
+|---|---|---|---|---|
+| 20260811 | 365.4 s | 6 | 2 | 33% |
+| 11111111 | 301.2 s | 5 | 2 | 40% |
+| 22222222 | **87.2 s** | 2 | 2 | **100%** |
+| 33333333 | 365.3 s | 6 | 2 | 33% |
+| 44444444 | **87.8 s** | 2 | 2 | **100%** |
+
+Antes del rediseño la muerte era en el tick 4577 (76 s), siempre. Ahora va de 87 a 365
+segundos, y **no hay término medio**: o el STALKER acierta sus dos primeros tiros y mata en
+87 s, o falla y la partida se estira a cinco o seis minutos. La media de acierto es 61%,
+cerca del ~50% que predijo el spec §12, pero la media esconde lo que pasa: no es una moneda
+por disparo, son dos regímenes.
+
+`[OPEN]` Esa bimodalidad es lo primero que hay que mirar en el playtest. Con un solo contacto
+puede ser correcta —el error de puntería depende de la geometría del spawn, que la semilla
+fija— pero si se mantiene con varios enemigos, la partida se decide en los primeros veinte
+segundos y eso sí sería un problema.
+
+**El baseline sólo habla de la oleada 1.** Sin input el único contacto nunca muere, así que
+la compuerta de "esperar a que se limpie" no deja entrar la oleada 2. No dice nada sobre
+2, 3 ni 4, que es justo donde vive la queja original de la andanada simultánea. Para medir
+eso hace falta jugar, o un bot que dispare.
+
+**El primer disparo enemigo cae siempre en el tick 2100.** Para una oleada de un contacto no
+hay azar en esa cuenta: `spawnTick 600 + EnemyFireIntervalTicks 1500 + 0`. La variación entra
+después, por la duda y por la geometría.
+
+**Nueve defectos, los nueve del plan y ninguno de la ejecución.** Vale anotar la forma que
+comparten, porque se va a repetir: todos compilaban y pasaban los tests. Eran correctos por
+accidente, sostenidos por los valores de hoy.
+
+Los dos que más enseñan:
+
+- Un test llamado `SilenceLetsTheFixGoStale` afirmaba lo correcto y **no probaba nada**:
+  capturaba el valor a los 31 ticks cuando una vuelta del haz tarda 210, así que comparaba el
+  cero del constructor contra sí mismo. Lo delató anular el método entero y contar cuántos
+  tests caían — tres de cuatro. El que quedaba en pie era el mentiroso.
+- `FiringRadius` se escribía, se poblaba y se testeaba, y **nadie lo leía**. Eso dejaba al RAM
+  disparando torpedos cuando su diseño entero es no disparar, y al STALKER tirando desde el
+  borde en vez de cerrar primero. Los tests no podían verlo: afirmaban que el dato era
+  correcto, no que alguien lo usara.
+
+- [ ] Pendiente de playtest: ¿la bimodalidad se mantiene con varios enemigos?
+- [ ] Pendiente de playtest: ¿se distinguen las personalidades mirando el scope?

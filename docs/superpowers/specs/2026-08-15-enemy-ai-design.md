@@ -166,11 +166,20 @@ A `0.10–0.28` · B `0.28–0.46` · C `0.46–0.64` · D `0.64–0.82` · E `0
 
 | | RadiusLoaded | RadiusEmpty | Orbit | FiringRadius | AimLead | Duda | Embiste |
 |---|---|---|---|---|---|---|---|
-| **PICKET** | 0.90 · E | 0.90 | alto | 0.90 | 0 | 4–12 s | no |
-| **STALKER** | 0.55 · C | 0.85 · E | bajo | 0.55 | 0 | 2–6 s | no |
-| **RAM** | 0.00 | 0.00 | nada | — nunca dispara | — | — | **sí** |
-| **GOAD** | 0.60 · C | 0.60 | medio | 0.60 | 0 · jitter alto | 0.5–2 s | no |
+| **PICKET** | 0.90 · E | 0.90 | alto | 0.95 | 0 | 4–12 s | no |
+| **STALKER** | 0.55 · C | 0.85 · E | bajo | 0.62 | 0 | 2–6 s | no |
+| **RAM** | 0.00 | 0.00 | nada | 0.00 · nunca dispara | — | — | **sí** |
+| **GOAD** | 0.60 · C | 0.60 | medio | 0.66 | 0 · jitter alto | 0.5–2 s | no |
 | **HUNTER** | 0.50 · C | 0.70 · D | bajo | 0.60 | **1** | 2–4 s | no |
+
+`[DECIDED]` **`FiringRadius` tiene que ser mayor que `RadiusLoaded`, no igual.** El gobierno
+integra `radial = hacia_afuera × (radioPreferido − radioActual)`, así que la aproximación al
+radio preferido es asintótica **desde afuera** y nunca lo cruza: medido sobre 100 s, el PICKET
+converge a 0.900000000 y el STALKER a 0.550000000, los dos estrictamente por fuera. Un radio de
+compromiso igual al preferido no se alcanzaría jamás y esa personalidad no dispararía nunca.
+La primera versión de esta tabla los tenía iguales, y como nada leía el campo el error no se
+notó hasta que se conectó.
+
 
 ### 4.1 Qué hace a cada una distinta
 
