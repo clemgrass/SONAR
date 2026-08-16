@@ -18,7 +18,6 @@ namespace Sonar.Game;
 public partial class Main : Node
 {
     private const int Seed = 20260811;
-    private const int MagazineSize = 3;
 
     private const double SubSpeed = 0.012;
     private static readonly Bearing Course = new(0);
@@ -29,6 +28,7 @@ public partial class Main : Node
     private int _lastTick;
 
     private double _tickDuration;
+    private int _magazineSize;
 
     private GameController _controller = null!;
     private SonarView _sonar = null!;
@@ -54,6 +54,7 @@ public partial class Main : Node
 
         var config = LoadConfig();
         _tickDuration = config.TickDurationSeconds;
+        _magazineSize = config.MagazineSize;
         _sonar.SetGeometry(config.DeadZoneRadius, config.BandOuterRadii.ToArray(),
             config.SweepPeriodSeconds / config.TickDurationSeconds);
 
@@ -275,10 +276,10 @@ public partial class Main : Node
     /// en la santabárbara, dos números sin relación separados por una barra que inventaba una.
     /// Los puntos dicen cuántos tubos hay listos sin obligar a leer un número.
     /// </summary>
-    private static string Tubes(int loaded)
+    private string Tubes(int loaded)
     {
         var full = new string('*', loaded);
-        var empty = new string('.', System.Math.Max(0, MagazineSize - loaded));
+        var empty = new string('.', System.Math.Max(0, _magazineSize - loaded));
         return $"tubes {full}{empty}";
     }
 
