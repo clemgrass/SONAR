@@ -245,6 +245,48 @@ git add src/Sonar.Controller/WaveDirector.cs tests/Sonar.Controller.Tests/WaveDi
 git commit -m "fix(controller): stop waves from being born already armed"
 ```
 
+- [ ] **Step 7: Acotar el reparto y prohibir el stagger cero**
+
+Salió de la revisión de calidad de esta tarea, y las dos mitades son el mismo bug —una oleada
+disparando como una sola andanada— por dos caminos distintos.
+
+`i * _config.EnemyFireStaggerTicks` escala con el tamaño de la oleada: con `MaxWaveSize = 512`
+el último contacto de una oleada máxima queda armado 153.300 ticks —unos 43 minutos a 60 Hz—
+después de entrar, o sea nunca. El escalonamiento existe para **garantizar separación en el
+tick de entrada**, no para marcar el ritmo, así que lo que se acota es el reparto completo:
+
+```csharp
+    /// <summary>
+    /// Techo del reparto de un escalonamiento completo. El valor está elegido para que las
+    /// oleadas 1 a 4 queden idénticas: la 4 son ocho contactos y su reparto son 7 x 300 =
+    /// 2100 ticks, justo el techo. Sólo recorta de la oleada 5 en adelante, que es
+    /// territorio sin medir — y así no perturba el baseline que mide la tarea 11.
+    /// </summary>
+    private const int MaxStaggerSpanTicks = 2100;
+```
+
+```csharp
+        // Reparto acotado: separación garantizada, costo acotado.
+        var step = count > 1
+            ? Math.Max(1, Math.Min((count - 1) * _config.EnemyFireStaggerTicks, MaxStaggerSpanTicks) / (count - 1))
+            : 0;
+```
+
+usando `i * step`. El piso `Math.Max(1, ...)` mantiene distintos los tiempos de disparo incluso
+en el caso degenerado de 512, que es lo que afirma `ContactsInAWaveDoNotAllFireOnTheSameTick`.
+
+Y en `src/Sonar.Core/SimulationConfig.cs`, `Validate()` rechazaba stagger negativo pero **no
+cero**, y cero colapsa el escalonamiento entero desde el JSON sin que ningún test lo vea:
+
+```csharp
+        // Cero no es sólo inútil, es peligroso: recrea en silencio el defecto de la andanada
+        // simultánea (§1.1) que WaveDirector arregla escalonando NextFireTick.
+        if (EnemyFireStaggerTicks <= 0) throw Bad(nameof(EnemyFireStaggerTicks), "debe ser mayor a cero.");
+```
+
+con su test en `SimulationConfigTests.cs`, y un test de reparto que afirme que la oleada 4 da
+exactamente 2100 y que la 5 no lo supera.
+
 ---
 
 ### Task 3: Borrar `ContactSpawner`
