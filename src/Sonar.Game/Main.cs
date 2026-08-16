@@ -18,6 +18,7 @@ namespace Sonar.Game;
 public partial class Main : Node
 {
     private const int Seed = 20260811;
+    private const int MagazineSize = 3;
 
     private const double SubSpeed = 0.012;
     private static readonly Bearing Course = new(0);
@@ -242,7 +243,7 @@ public partial class Main : Node
 
         _hud.Text =
             $"{MissionClock(snap.Tick)}    wave {_controller.Wave}    " +
-            $"ammo {snap.AmmoLoaded}/{snap.AmmoReserve}    " +
+            $"{Tubes(snap.AmmoLoaded)}    reserve {snap.AmmoReserve}    " +
             $"defenses {snap.DefensesAvailable}    hits {snap.HitsTaken}/2" +
             (snap.ReloadInProgress ? "    RELOADING" : string.Empty) +
             (snap.SweepRunning ? string.Empty : "    SWEEP STOPPED") +
@@ -267,6 +268,18 @@ public partial class Main : Node
     {
         var seconds = tick * _tickDuration;
         return $"{(int)(seconds / 60):D2}:{(int)(seconds % 60):D2}";
+    }
+
+    /// <summary>
+    /// `ammo 3/12` se leía como "te quedan 3 de 12". No es eso: son tres en los tubos y doce
+    /// en la santabárbara, dos números sin relación separados por una barra que inventaba una.
+    /// Los puntos dicen cuántos tubos hay listos sin obligar a leer un número.
+    /// </summary>
+    private static string Tubes(int loaded)
+    {
+        var full = new string('*', loaded);
+        var empty = new string('.', System.Math.Max(0, MagazineSize - loaded));
+        return $"tubes {full}{empty}";
     }
 
     /// <summary>

@@ -16,6 +16,6 @@
   "defenseCapacity": 1,
   "magazineSize": 3,
   "ammoReserve": 12,
-  "reloadTicks": 420,
-  "enemyReloadTicks": 840
+  "reloadTicks": 180,
+  "enemyReloadTicks": 600
 }

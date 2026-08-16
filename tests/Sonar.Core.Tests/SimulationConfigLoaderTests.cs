@@ -78,6 +78,19 @@ public class SimulationConfigLoaderTests
         SimulationConfigLoader.LoadFromJson(File.ReadAllText(path));   // no debe lanzar
     }
 
+    [Fact]
+    public void WorkingConfig_HasThePlayerReloadAtThreeSeconds()
+    {
+        var json = System.IO.File.ReadAllText(
+            System.IO.Path.Combine(RepoRoot(), "config", "simulation.working.json"));
+        var config = SimulationConfigLoader.LoadFromJson(json);
+
+        Assert.Equal(180, config.ReloadTicks);        // 3.0 s a 60 Hz
+        Assert.Equal(600, config.EnemyReloadTicks);   // 10.0 s
+        Assert.True(config.EnemyReloadTicks > config.ReloadTicks * 3,
+            "el enemigo tiene que seguir ciclando mucho más lento que el jugador");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
