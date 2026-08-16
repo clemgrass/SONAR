@@ -101,10 +101,10 @@ public sealed class WaveDirector
         // el corrimiento nunca se envuelve y MaxWaveSize hace el resto del trabajo.
         var exponent = Math.Min(Wave - 1, 30);
         var count = Math.Min(1 << exponent, MaxWaveSize);
-        return Spawn(count);
+        return Spawn(count, tick);
     }
 
-    private IReadOnlyList<Contact> Spawn(int count)
+    private IReadOnlyList<Contact> Spawn(int count, int spawnTick)
     {
         var ceiling = _config.EnemyTorpedoSpeed * ClosingCeilingOfTorpedoSpeed;
         var closing = Math.Min(ClosingBase + (Wave - 1) * ClosingStep, ceiling);
@@ -134,7 +134,16 @@ public sealed class WaveDirector
                 // todo lo que entra por un lado cae encima del submarino en segundos.
                 Velocity = outward * -closing - _worldDrift,
                 Alive = true,
-                NextFireTick = _config.EnemyFireIntervalTicks,
+                // Relativo a la aparición, no absoluto. Con el valor absoluto que había
+                // antes, el plazo se consumía oleada a oleada y de la cuarta en adelante
+                // los contactos nacían armados y disparaban en el tick en que entraban.
+                //
+                // El escalonamiento es determinista y no toca el generador de azar: sin él
+                // toda la oleada dispara en el mismo tick y la presión llega sincronizada
+                // en vez de sostenida.
+                NextFireTick = spawnTick
+                               + _config.EnemyFireIntervalTicks
+                               + i * _config.EnemyFireStaggerTicks,
             });
         }
 

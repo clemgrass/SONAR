@@ -197,4 +197,33 @@ public class WaveDirectorTests
 
         Assert.NotEqual(a, b);
     }
+
+    [Fact]
+    public void NoWaveIsEverBornAlreadyArmed()
+    {
+        // El defecto original: NextFireTick era un tick absoluto, así que de la oleada 4 en
+        // adelante el plazo ya había vencido y los contactos disparaban al aparecer.
+        var log = RunClearingInstantly(New(), 20000);
+
+        foreach (var (tick, spawned) in log)
+        foreach (var contact in spawned)
+            Assert.True(contact.NextFireTick > tick,
+                $"El contacto {contact.Id.Value} de la oleada que entra en {tick} " +
+                $"nace armado (NextFireTick={contact.NextFireTick}).");
+    }
+
+    [Fact]
+    public void ContactsInAWaveDoNotAllFireOnTheSameTick()
+    {
+        var log = RunClearingInstantly(New(), 20000);
+
+        foreach (var (tick, spawned) in log)
+        {
+            if (spawned.Count < 2) continue;
+            var distinct = spawned.Select(c => c.NextFireTick).Distinct().Count();
+            Assert.True(distinct == spawned.Count,
+                $"La oleada que entra en {tick} tiene {spawned.Count} contactos pero sólo " +
+                $"{distinct} tiempos de disparo distintos.");
+        }
+    }
 }
