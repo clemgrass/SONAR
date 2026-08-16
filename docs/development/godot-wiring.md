@@ -323,9 +323,11 @@ jugando, no razonando:
    pura y cruza el scope de norte a sur. Sin una referencia que sí derive, la anomalía de
    las defensas no se puede leer.
 
-`ContactSpawner` escalona los tiempos de disparo. Sin escalonar, los cuatro enemigos
+El `WaveDirector` escalona los tiempos de disparo. Sin escalonar, los cuatro enemigos
 dispararían en el mismo tick y la presión llegaría en oleadas sincronizadas en vez de
-sostenida.
+sostenida. Lo hacía una clase aparte, `ContactSpawner`, que el `WaveDirector` **nunca llegó a
+llamar** — por eso el escalonamiento no ocurría en la demo aunque tuviera tests que pasaban.
+Esa clase ya no existe: tener dos dueños del spawn era la causa del defecto.
 
 Estos números son material de M1: la pregunta 3 se responde tocándolos y volviendo a jugar.
 Lo pinchan `OpeningScenarioTests`, que fallan si el escenario se vuelve a degenerar.

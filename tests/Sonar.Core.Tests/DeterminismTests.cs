@@ -79,6 +79,14 @@ public class DeterminismTests
             [300] = new Command[] { new FireCommand(new TargetCoordinate(new Bearing(270), new Band(4))) },
         };
 
+    /// <summary>
+    /// Escenario de combate para el chequeo de determinismo. Los tiempos de disparo salen de
+    /// `EnemyFireIntervalTicks` (420) + i * `EnemyFireStaggerTicks` (70) de TestWorld.Config():
+    /// 420, 490, 560. Los valores concretos no le importan al test —lo que prueba es que dos
+    /// corridas con la misma semilla dan el mismo hash— pero sí importa que los tres alcancen
+    /// a disparar dentro del presupuesto de 1200 ticks, o el determinismo quedaría comprobado
+    /// sólo sobre movimiento y no sobre fuego enemigo.
+    /// </summary>
     private static IEnumerable<Contact> CombatContacts() => new[]
     {
         new Contact

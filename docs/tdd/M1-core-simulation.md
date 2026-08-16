@@ -495,8 +495,10 @@ que ya habían entrado, no con los del borde.
 Por eso `Torpedo` lleva `SourceContactId`: es lo que permite responder "¿este enemigo ya tiene uno
 en el agua?".
 
-`[DECIDED]` **`EnemyFireIntervalTicks` ya no gobierna la cadencia.** Sólo lo usa `ContactSpawner`
-para decidir cuándo un contacto recién aparecido queda armado por primera vez.
+`[DECIDED]` **`EnemyFireIntervalTicks` no gobierna la cadencia.** Sólo lo usa el `WaveDirector`
+para decidir cuánto tarda en armarse un contacto recién aparecido, **contado desde su
+aparición y no como un tick absoluto** — el bug de la andanada simultánea era exactamente eso,
+y está en el §1.1 del spec del 2026-08-15.
 
 `[DECIDED]` **Dispara hacia dónde está el submarino, no hacia dónde estará.** El submarino está
 fijo en el origen, así que la distinción no existe: el torpedo enemigo viaja recto por la marcación
