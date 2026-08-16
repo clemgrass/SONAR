@@ -64,4 +64,23 @@ public sealed record Torpedo
         RunToRadius = 0,
         SourceContactId = sourceContactId,
     };
+
+    /// <summary>
+    /// Torpedo enemigo dirigido a un punto que no es necesariamente el origen: la
+    /// estimación envejecida que el enemigo tiene del jugador. Si el punto coincide con el
+    /// origen, es idéntico a CreateEnemy.
+    /// </summary>
+    public static Torpedo CreateEnemyToward(
+        TorpedoId id, Vec2 origin, Vec2 target, double speed, int sourceContactId = -1) => new()
+    {
+        Id = id,
+        Side = TorpedoSide.Enemy,
+        Position = origin,
+        Direction = (target - origin).Normalized(),
+        Speed = speed,
+        Bearing = new Bearing(0),
+        ArmedFromRadius = 0,
+        RunToRadius = 0,
+        SourceContactId = sourceContactId,
+    };
 }

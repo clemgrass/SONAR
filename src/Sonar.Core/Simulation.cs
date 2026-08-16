@@ -84,7 +84,7 @@ public sealed class Simulation : ISimulation
         }
 
         // 5 · Disparo enemigo
-        state = FireEnemyTorpedoes(state, contacts, torpedoes, events);
+        state = FireEnemyTorpedoes(state, contacts, torpedoes, events, worldDrift, dt);
 
         // 6 · Mover torpedos
         for (var i = 0; i < torpedoes.Count; i++)
@@ -152,7 +152,8 @@ public sealed class Simulation : ISimulation
     /// decidir cuánto tarda en armarse un contacto recién aparecido.
     /// </summary>
     private WorldState FireEnemyTorpedoes(
-        WorldState state, List<Contact> contacts, List<Torpedo> torpedoes, List<GameEvent> events)
+        WorldState state, List<Contact> contacts, List<Torpedo> torpedoes,
+        List<GameEvent> events, Vec2 worldDrift, double dt)
     {
         for (var i = 0; i < contacts.Count; i++)
         {
@@ -170,14 +171,47 @@ public sealed class Simulation : ISimulation
             var (id, advanced) = state.TakeEntityId();
             state = advanced;
 
-            torpedoes.Add(Torpedo.CreateEnemy(new TorpedoId(id), contact.Position,
-                _config.EnemyTorpedoSpeed, contact.Id.Value));
+            var target = EstimatedSubPosition(contact, state.Tick, worldDrift, dt);
+            torpedoes.Add(Torpedo.CreateEnemyToward(new TorpedoId(id), contact.Position,
+                target, _config.EnemyTorpedoSpeed, contact.Id.Value));
             events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
 
             contacts[i] = contact with { NextFireTick = state.Tick + _config.EnemyReloadTicks };
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// La estimación limpia: dónde cree este enemigo que está el jugador, sin el error de
+    /// puntería. La usa el gobierno del movimiento (tarea 8) y es la base de la otra.
+    /// </summary>
+    private Vec2 EstimatedCentre(Contact contact, int tick, Vec2 worldDrift, double dt)
+    {
+        if (contact.Personality is null) return Vec2.Zero;
+        var age = Math.Max(0, tick - contact.LastFixTick);
+        return worldDrift * (age * dt) * (1.0 - contact.Personality.AimLead);
+    }
+
+    /// <summary>
+    /// Dónde cree este enemigo que está el jugador. El submarino está clavado en el origen y
+    /// el mundo deriva alrededor, así que un contacto viejo envejece solo hacia atrás en el
+    /// rumbo: el punto de agua donde el jugador estaba hace N ticks es hoy `deriva × N × dt`.
+    ///
+    /// Sin personalidad devuelve el origen exacto — el comportamiento de siempre.
+    /// </summary>
+    private Vec2 EstimatedSubPosition(Contact contact, int tick, Vec2 worldDrift, double dt)
+    {
+        if (contact.Personality is null) return Vec2.Zero;
+
+        var stale = EstimatedCentre(contact, tick, worldDrift, dt);
+        if (contact.Personality.AimJitter <= 0.0) return stale;
+
+        // Ruido puro, sólo donde el carácter lo pide. Se consume del generador sembrado en
+        // orden de id, como todo lo demás, para no romper el determinismo.
+        var angle = _random.NextDouble() * Math.PI * 2.0;
+        var radius = _random.NextDouble() * contact.Personality.AimJitter;
+        return stale + new Vec2(Math.Cos(angle) * radius, Math.Sin(angle) * radius);
     }
 
     /// <summary>

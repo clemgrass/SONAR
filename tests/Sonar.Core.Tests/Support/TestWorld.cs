@@ -45,4 +45,15 @@ public static class TestWorld
         return new Simulation(c, new SeededRandomSource(1),
             WorldState.CreateInitial(c, new Bearing(0), speed));
     }
+
+    /// <summary>
+    /// Como Still() pero con el submarino avanzando, que es lo que hace que la deriva del
+    /// mundo sea distinta de cero. Sin deriva no hay envejecimiento que medir.
+    /// </summary>
+    public static Simulation Moving(SimulationConfig? config = null)
+    {
+        var c = config ?? Config();
+        return new Simulation(c, new SeededRandomSource(1),
+            WorldState.CreateInitial(c, new Bearing(0), speed: 0.012));
+    }
 }
