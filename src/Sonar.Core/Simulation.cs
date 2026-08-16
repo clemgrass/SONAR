@@ -180,10 +180,32 @@ public sealed class Simulation : ISimulation
                 target, _config.EnemyTorpedoSpeed, contact.Id.Value));
             events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
 
-            contacts[i] = contact with { NextFireTick = state.Tick + _config.EnemyReloadTicks };
+            contacts[i] = contact with
+            {
+                NextFireTick = state.Tick + _config.EnemyReloadTicks + Hesitation(contact),
+            };
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// Cuánto tarda este enemigo en decidirse, sorteado uniforme dentro de su ventana.
+    ///
+    /// El argumento a favor no es el realismo: el escalonamiento del WaveDirector arregla la
+    /// primera andanada, pero con recargas idénticas los enemigos <b>se vuelven a sincronizar
+    /// solos</b> a las pocas vueltas y la pared reaparece. Esto es lo único que lo impide para
+    /// siempre.
+    /// </summary>
+    private int Hesitation(Contact contact)
+    {
+        if (contact.Personality is null) return 0;
+
+        var min = contact.Personality.HesitationMinTicks;
+        var max = contact.Personality.HesitationMaxTicks;
+        if (max <= min) return min;
+
+        return min + (int)(_random.NextDouble() * (max - min + 1));
     }
 
     /// <summary>
