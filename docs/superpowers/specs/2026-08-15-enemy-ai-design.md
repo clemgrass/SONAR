@@ -153,9 +153,13 @@ public sealed record Personality
     public required int HesitationMinTicks { get; init; }
     public required int HesitationMaxTicks { get; init; }
     public required bool Rams { get; init; }
-    public required bool NoisyApproach { get; init; }
 }
 ```
+
+`[DECIDED]` **Una embestida siempre suena.** No hay un parámetro `NoisyApproach` aparte,
+porque en el roster entero sería siempre igual a `Rams` y un campo que nunca difiere de otro
+es una mentira sobre lo que el sistema puede hacer. Que el kamikaze avise no es una perilla:
+es la regla que impide que mate con algo que no se pudo anticipar.
 
 `[DECIDED]` El roster de M1 son cinco. Bandas según `bandOuterRadii`:
 A `0.10–0.28` · B `0.28–0.46` · C `0.46–0.64` · D `0.64–0.82` · E `0.82–1.00`.
@@ -181,7 +185,7 @@ El alejarse *es* el aviso de que el jugador tiene una ventana.
 **RAM · el kamikaze.** Raro. No dispara jamás: te busca y se te tira encima, y el contacto
 mata al instante. La única amenaza que se mide en radio y no en torpedos.
 
-`[DECIDED]` **El RAM hace ruido al acercarse** (`NoisyApproach`). Un kamikaze silencioso es
+`[DECIDED]` **El RAM hace ruido al acercarse.** Un kamikaze silencioso es
 exactamente la injusticia que hay que sacar: mata algo que no se pudo anticipar. Con ruido,
 la muerte por embestida siempre viene con un aviso que se pudo leer.
 
@@ -207,11 +211,18 @@ puesta al nacer; ahora hay una fase de gobierno que la recalcula cada tick:
 
 ```
 radioPreferido = tieneTorpedo ? RadiusLoaded : RadiusEmpty
-hacia_afuera   = versor del origen al contacto
+centro         = puntoDeMira            // su estimación, NO el origen
+hacia_afuera   = versor del centro al contacto
+radioActual    = distancia(contacto, centro)
 radial   = hacia_afuera × (radioPreferido − radioActual)   // negativo ⇒ se acerca
 tangente = perpendicular(hacia_afuera) × OrbitRate
 velocidad = clamp(radial + tangente) − derivaDelMundo
 ```
+
+`[DECIDED]` **El centro del gobierno es la estimación, no el origen.** Con eso la
+convergencia del §3.3 —apiñarse sobre el agua vacía que el jugador dejó atrás— no necesita
+ninguna regla aparte: es el mismo cálculo, orbitando un punto equivocado. Un enemigo se
+mueve siempre respecto de dónde *cree* que estás.
 
 `[DECIDED]` Se conservan dos cosas que ya están y ya tienen tests:
 
