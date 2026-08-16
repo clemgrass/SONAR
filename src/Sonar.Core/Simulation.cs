@@ -74,8 +74,12 @@ public sealed class Simulation : ISimulation
         var defenses = state.Defenses.ToList();
         var sub = state.Sub;
 
-        // 4 · Mover contactos — reciben la deriva. Las defensas NO: esa omisión
-        //     deliberada es la anomalía del §25 del GDD. Ver TDD §4.4.
+        // 4 · Gobernar y mover contactos — reciben la deriva. Las defensas NO: esa omisión
+        //     deliberada es la anomalía del §25 del GDD. Ver TDD §4.4. El gobierno va
+        //     primero para que la velocidad que se integra sea la de este tick y no la
+        //     del anterior.
+        SteerContacts(contacts, torpedoes, state.Tick, worldDrift, dt);
+
         for (var i = 0; i < contacts.Count; i++)
         {
             var c = contacts[i];
@@ -180,6 +184,55 @@ public sealed class Simulation : ISimulation
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// Fase 4b · Gobierno del movimiento. Los contactos con personalidad dejan de ser
+    /// balísticos: cada tick se les recalcula la velocidad para llevarlos al radio que
+    /// prefieren, con una componente tangencial que los hace rodear.
+    ///
+    /// <b>El centro es su estimación, no el origen.</b> Con eso la convergencia sobre el agua
+    /// vacía que el jugador dejó atrás no necesita ninguna regla aparte: es el mismo cálculo
+    /// orbitando un punto equivocado. Un enemigo se mueve siempre respecto de dónde cree que
+    /// estás.
+    ///
+    /// Los contactos sin personalidad no se tocan: conservan la velocidad con la que nacieron.
+    /// </summary>
+    private void SteerContacts(
+        List<Contact> contacts, List<Torpedo> torpedoes, int tick, Vec2 worldDrift, double dt)
+    {
+        var ceiling = _config.EnemyTorpedoSpeed / 2.0;
+
+        for (var i = 0; i < contacts.Count; i++)
+        {
+            var contact = contacts[i];
+            if (contact.Personality is null || !contact.Alive) continue;
+            if (contact.Kind != ContactKind.Enemy) continue;
+
+            var loaded = !torpedoes.Any(t => t.Side == TorpedoSide.Enemy
+                                             && t.SourceContactId == contact.Id.Value);
+            var preferred = loaded
+                ? contact.Personality.RadiusLoaded
+                : contact.Personality.RadiusEmpty;
+
+            var centre = EstimatedCentre(contact, tick, worldDrift, dt);
+            var offset = contact.Position - centre;
+            var distance = offset.Length;
+
+            // Encima del centro no hay dirección definida; se deja quieto un tick.
+            if (distance < 1e-9) continue;
+
+            var outward = offset * (1.0 / distance);
+            var radial = outward * (preferred - distance);
+            var tangent = new Vec2(-outward.Y, outward.X) * contact.Personality.OrbitRate;
+
+            var desired = radial + tangent;
+            if (desired.Length > ceiling) desired = desired.Normalized() * ceiling;
+
+            // Se resta la deriva para que el movimiento NETO sea el pedido: la fase 4 se la
+            // vuelve a sumar a todos los contactos.
+            contacts[i] = contact with { Velocity = desired - worldDrift };
+        }
     }
 
     /// <summary>

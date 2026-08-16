@@ -90,10 +90,18 @@ public class NoiseTests
     {
         var config = TestWorld.Config();
         var sim = TestWorld.Still(config);
-        // Dentro del radio de escucha pasiva.
+        // Dentro del radio de escucha pasiva. Sin personalidad a propósito (tarea 8): este
+        // test aísla la fase 10b, que no lee Personality en absoluto. Con PICKET el
+        // gobierno del movimiento lo saca del radio de escucha camino a la banda E —su
+        // radio preferido es 0.90, muy por fuera del 0.46 de PassiveHearingRadius— y
+        // contamina la medición con un mecanismo que este test no quiere ejercitar.
         sim.SetContacts(new[]
         {
-            FarEnemy(1) with { Position = new Vec2(0.0, -config.PassiveHearingRadius * 0.5) },
+            FarEnemy(1) with
+            {
+                Position = new Vec2(0.0, -config.PassiveHearingRadius * 0.5),
+                Personality = null,
+            },
         });
         sim.Tick(new Command[] { new ToggleSonarCommand() });
 
