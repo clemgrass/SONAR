@@ -37,6 +37,13 @@ public sealed record SimulationConfig
 
     public double SubHitRadius { get; init; }
 
+    /// <summary>
+    /// Dentro de este radio un enemigo oye al jugador aunque esté en silencio absoluto: el
+    /// sonido se atenúa con la distancia. Es lo que hace que callarse proteja de los lejanos
+    /// y nunca de los cercanos, y lo que hace que acercarse sea la forma de apuntar.
+    /// </summary>
+    public double PassiveHearingRadius { get; init; }
+
     public double DefenseRadius { get; init; }
     public int DefenseCapacity { get; init; }
 
@@ -60,6 +67,7 @@ public sealed record SimulationConfig
         Positive(BlastRadius, nameof(BlastRadius));
         Positive(NearMissRadius, nameof(NearMissRadius));
         Positive(SubHitRadius, nameof(SubHitRadius));
+        Positive(PassiveHearingRadius, nameof(PassiveHearingRadius));
         Positive(DefenseRadius, nameof(DefenseRadius));
         Positive(DeadZoneRadius, nameof(DeadZoneRadius));
 

@@ -111,6 +111,9 @@ public sealed class Simulation : ISimulation
         // 10 · Barrido y registro de lecturas
         var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
+        // 10b · Qué delata al jugador
+        contacts = RefreshEnemyFixes(contacts, events, state.Tick);
+
         // 11 · Recarga
         sub = AdvanceReload(sub, state.Tick, events);
 
@@ -628,5 +631,34 @@ public sealed class Simulation : ISimulation
             Revolution = revolution,
             Readings = ordered,
         };
+    }
+
+    /// <summary>
+    /// Fase 10b · Qué delata al jugador. Cada enemigo guarda un solo dato —el tick en que lo
+    /// escuchó por última vez— y esta fase es lo único que lo escribe.
+    ///
+    /// Corre después del barrido para que `SweepCompleted` de este tick ya esté en la lista.
+    /// El disparo enemigo (fase 5) usa entonces los contactos del tick anterior: un tick de
+    /// desfase, imperceptible, y a cambio el orden queda sin ambigüedad.
+    /// </summary>
+    private List<Contact> RefreshEnemyFixes(List<Contact> contacts, List<GameEvent> events, int tick)
+    {
+        var loud = events.Any(e => e is SweepCompleted
+                                or TorpedoFired
+                                or ReloadStarted
+                                or DefenseDeployed);
+
+        for (var i = 0; i < contacts.Count; i++)
+        {
+            var contact = contacts[i];
+            if (contact.Kind != ContactKind.Enemy || !contact.Alive) continue;
+            if (contact.Position.Length > 1.0) continue;
+
+            // La cercanía oye sin que el jugador haga nada.
+            var close = contact.Position.Length <= _config.PassiveHearingRadius;
+            if (loud || close) contacts[i] = contact with { LastFixTick = tick };
+        }
+
+        return contacts;
     }
 }

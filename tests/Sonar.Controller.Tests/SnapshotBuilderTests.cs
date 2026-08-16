@@ -26,6 +26,7 @@ public class SnapshotBuilderTests
         EnemyFireIntervalTicks = 420,
         EnemyFireStaggerTicks = 70,
         SubHitRadius = 0.045,
+        PassiveHearingRadius = 0.46,
         DefenseRadius = 0.070,
         DefenseCapacity = 3,
         MagazineSize = 4,

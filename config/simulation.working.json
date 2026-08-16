@@ -12,6 +12,7 @@
   "enemyFireIntervalTicks": 1500,
   "enemyFireStaggerTicks": 300,
   "subHitRadius": 0.045,
+  "passiveHearingRadius": 0.46,
   "defenseRadius": 0.070,
   "defenseCapacity": 1,
   "magazineSize": 3,

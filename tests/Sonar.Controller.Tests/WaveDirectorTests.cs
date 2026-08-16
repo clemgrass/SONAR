@@ -24,6 +24,7 @@ public class WaveDirectorTests
         EnemyFireIntervalTicks = 1500,
         EnemyFireStaggerTicks = 300,
         SubHitRadius = 0.045,
+        PassiveHearingRadius = 0.46,
         DefenseRadius = 0.070,
         DefenseCapacity = 1,
         MagazineSize = 3,
