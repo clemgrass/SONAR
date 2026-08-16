@@ -949,11 +949,18 @@ public class StaleAimTests
 {
     private static readonly IReadOnlyList<Command> NoCommands = Array.Empty<Command>();
 
-    private static Contact Enemy(Personality personality, int lastFixTick) => new()
+    // El contacto va FUERA del eje del rumbo. En (0.0, -0.90) —sobre el norte puro que usa
+    // Moving()— la deriva, el contacto y el origen quedan colineales, y entonces cualquier
+    // envejecimiento desplaza la mira a lo largo de esa misma recta: la dirección del torpedo
+    // no cambia nunca. Con esa geometría un test no puede pasar y el otro no puede fallar.
+    // Es el mismo defecto de "marcación 000" que ya mordió antes en este proyecto.
+    private static readonly Vec2 StartPosition = new(0.30, -0.85);
+
+    private static Contact Enemy(Personality? personality, int lastFixTick) => new()
     {
         Id = new ContactId(1),
         Kind = ContactKind.Enemy,
-        Position = new Vec2(0.0, -0.90),
+        Position = StartPosition,
         Velocity = Vec2.Zero,
         Alive = true,
         NextFireTick = 0,
@@ -961,17 +968,27 @@ public class StaleAimTests
         Personality = personality,
     };
 
+    /// <summary>
+    /// Dirección real hacia el origen, calculada desde la posición del contacto <b>ya movida
+    /// por este tick</b>: la fase 4 mueve los contactos antes de que la fase 5 dispare. Usar
+    /// la posición de spawn cruda mete un desvío del orden de 1e-4 en cuanto el contacto no
+    /// está sobre el eje, y rompe la comparación a precision:6 por una razón que no tiene
+    /// nada que ver con lo que el test mide.
+    /// </summary>
+    private static Vec2 TowardOriginFrom(Simulation sim) =>
+        (Vec2.Zero - sim.State.Contacts.Single(c => c.Id.Value == 1).Position).Normalized();
+
     [Fact]
     public void AContactWithoutPersonalityStillAimsStraightAtTheOrigin()
     {
         // El comportamiento de siempre tiene que seguir intacto: es lo que sostiene a los
         // tests anteriores.
         var sim = TestWorld.Moving();
-        sim.SetContacts(new[] { Enemy(null!, 0) with { Personality = null } });
+        sim.SetContacts(new[] { Enemy(null, lastFixTick: 0) });
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);
-        var towardOrigin = (Vec2.Zero - new Vec2(0.0, -0.90)).Normalized();
+        var towardOrigin = TowardOriginFrom(sim);
         Assert.Equal(towardOrigin.X, torpedo.Direction.X, precision: 6);
         Assert.Equal(towardOrigin.Y, torpedo.Direction.Y, precision: 6);
     }
@@ -985,7 +1002,7 @@ public class StaleAimTests
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);
-        var towardOrigin = (Vec2.Zero - new Vec2(0.0, -0.90)).Normalized();
+        var towardOrigin = TowardOriginFrom(sim);
 
         // Apunta a otro lado que el origen.
         var dot = torpedo.Direction.X * towardOrigin.X + torpedo.Direction.Y * towardOrigin.Y;
@@ -1001,7 +1018,7 @@ public class StaleAimTests
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);
-        var towardOrigin = (Vec2.Zero - new Vec2(0.0, -0.90)).Normalized();
+        var towardOrigin = TowardOriginFrom(sim);
         Assert.Equal(towardOrigin.X, torpedo.Direction.X, precision: 6);
         Assert.Equal(towardOrigin.Y, torpedo.Direction.Y, precision: 6);
     }
@@ -1014,7 +1031,7 @@ public class StaleAimTests
         sim.Tick(NoCommands);
 
         var torpedo = sim.State.Torpedoes.Single(t => t.Side == TorpedoSide.Enemy);
-        var towardOrigin = (Vec2.Zero - new Vec2(0.0, -0.90)).Normalized();
+        var towardOrigin = TowardOriginFrom(sim);
         Assert.Equal(towardOrigin.X, torpedo.Direction.X, precision: 6);
         Assert.Equal(towardOrigin.Y, torpedo.Direction.Y, precision: 6);
     }
