@@ -1197,7 +1197,7 @@ public class SteeringTests
 {
     private static readonly IReadOnlyList<Command> NoCommands = Array.Empty<Command>();
 
-    private static Contact At(double radius, Personality personality, int ammo = 1) => new()
+    private static Contact At(double radius, Personality? personality) => new()
     {
         Id = new ContactId(1),
         Kind = ContactKind.Enemy,
@@ -1215,7 +1215,7 @@ public class SteeringTests
         // Esto es lo que sostiene todos los tests anteriores: sin personalidad, balístico.
         var sim = TestWorld.Still();
         var velocity = new Vec2(0.01, 0.02);
-        sim.SetContacts(new[] { At(0.9, null!) with { Personality = null, Velocity = velocity } });
+        sim.SetContacts(new[] { At(0.9, personality: null) with { Velocity = velocity } });
 
         for (var i = 0; i < 60; i++) sim.Tick(NoCommands);
 
@@ -1262,9 +1262,14 @@ public class SteeringTests
         // un torpedo suyo en el agua, que es lo que la regla mira.
         var sim = TestWorld.Still();
         sim.SetContacts(new[] { At(0.55, PersonalityCatalog.Stalker) });
+        // El torpedo va hacia AFUERA a proposito: uno dirigido al origen impactaria sobre
+        // el submarino dentro de la ventana del test, desapareceria, y el STALKER volveria a
+        // contarse como cargado a mitad de la medicion. Lo unico que la regla mira es que
+        // exista un torpedo suyo en el agua, no donde este.
         sim.SetTorpedoes(new[]
         {
-            Torpedo.CreateEnemy(new TorpedoId(900), new Vec2(0.0, -0.30), 0.03, sourceContactId: 1),
+            Torpedo.CreateEnemyToward(new TorpedoId(900), new Vec2(0.50, 0.0),
+                new Vec2(1.00, 0.0), 0.03, sourceContactId: 1),
         });
 
         var before = sim.State.Contacts[0].Position.Length;
@@ -1331,7 +1336,7 @@ En `src/Sonar.Core/Simulation.cs`:
                 ? contact.Personality.RadiusLoaded
                 : contact.Personality.RadiusEmpty;
 
-            var centre = EstimatedSubPosition(contact, tick, worldDrift, dt);
+            var centre = EstimatedCentre(contact, tick, worldDrift, dt);
             var offset = contact.Position - centre;
             var distance = offset.Length;
 
@@ -1375,7 +1380,20 @@ dos veces por tick y rompería la reproducibilidad.
 - [ ] **Step 4: Correr los tests**
 
 Run: `dotnet test`
-Expected: PASS, toda la suite. Especial atención a `WaveDirectorTests` y `GauntletDeterminismTests`: si alguno falla, es porque el gobierno cambió trayectorias que ese test daba por fijas — **leer el test antes de tocarlo**.
+Expected: **NO** pasa toda la suite a la primera. `NoiseTests.ProximityRefreshesEvenInTotalSilence`
+se rompe, y conviene saber por qué antes de mirarlo: su helper `FarEnemy` lleva
+`Personality = PersonalityCatalog.Picket`, y ese test es el único que reposiciona el contacto
+dentro del radio de escucha. En cuanto existe el gobierno, el PICKET tira de él hacia su radio
+preferido de 0.90, cruza el 0.46 a mitad de la ventana y el refresco por cercanía deja de
+dispararse.
+
+El arreglo correcto es ponerle `Personality = null` **a ese contacto**: el test aísla la fase
+10b, que no lee `Personality` en absoluto, así que la personalidad ahí era incidental. No tocar
+los otros tres tests del archivo — usan la posición lejana y son estables bajo gobierno.
+
+Especial atención también a `WaveDirectorTests` y a los tests de determinismo: si alguno falla,
+es porque el gobierno cambió trayectorias que ese test daba por fijas — **leer el test antes de
+tocarlo**.
 
 - [ ] **Step 5: Mutación — que el techo de velocidad muerda**
 
