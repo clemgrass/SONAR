@@ -78,7 +78,19 @@ public sealed record EnemyTorpedoDestroyed(int Tick, int TorpedoId, Vec2 Positio
 public sealed record SubHit(int Tick, int HitsTaken) : GameEvent(Tick);
 public sealed record SubDestroyed(int Tick, SubDeathCause Cause) : GameEvent(Tick);
 
-public enum DestructionCause { DirectHit, Blast, Defense, TorpedoCollision }
+public enum DestructionCause
+{
+    DirectHit,
+    Blast,
+    Defense,
+    TorpedoCollision,
+
+    /// <summary>
+    /// Un torpedo enemigo alcanzó a otro enemigo. Tiene su propia causa porque en los datos
+    /// hay que poder separarla de una muerte que se anotó el jugador.
+    /// </summary>
+    FriendlyFire,
+}
 public enum RejectionReason { NoAmmo, Reloading, NoneAvailable }
 
 /// <summary>

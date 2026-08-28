@@ -311,18 +311,30 @@ public sealed class Simulation : ISimulation
         for (var t = torpedoes.Count - 1; t >= 0; t--)
         {
             var torpedo = torpedoes[t];
-            if (torpedo.Side != TorpedoSide.Own) continue;
             if (torpedo.Position.Length < torpedo.ArmedFromRadius) continue;
 
             for (var c = 0; c < contacts.Count; c++)
             {
                 var contact = contacts[c];
                 if (!contact.Alive) continue;
+
+                if (torpedo.Side == TorpedoSide.Enemy)
+                {
+                    // Los pecios siguen inmunes al fuego enemigo: la anomalía del §25 necesita
+                    // que ese pecio sobreviva como referencia.
+                    if (contact.Kind != ContactKind.Enemy) continue;
+                    // Y nadie se mata a sí mismo: el torpedo nace encima de su lanzador.
+                    if (contact.Id.Value == torpedo.SourceContactId) continue;
+                }
+
                 if (Vec2.Distance(torpedo.Position, contact.Position) >= _config.HitRadius) continue;
 
                 contacts[c] = contact with { Alive = false };
-                events.Add(new ContactDestroyed(tick, contact.Id.Value,
-                    torpedo.Position, DestructionCause.DirectHit, torpedo.Id.Value));
+                events.Add(new ContactDestroyed(tick, contact.Id.Value, torpedo.Position,
+                    torpedo.Side == TorpedoSide.Enemy
+                        ? DestructionCause.FriendlyFire
+                        : DestructionCause.DirectHit,
+                    torpedo.Id.Value));
                 torpedoes.RemoveAt(t);
                 break;
             }
@@ -369,6 +381,35 @@ public sealed class Simulation : ISimulation
                 destroyed.Add(enemy.Id.Value);
                 break;
             }
+        }
+
+        // Enemigo contra enemigo. Va en un bucle aparte y no mezclado con el de arriba para
+        // que el orden de resolución siga siendo el de ids ascendentes dentro de cada clase,
+        // que es lo que hace reproducible el desempate.
+        //
+        // Comparte la lista `destroyed` con el bucle de arriba, y eso decide los cruces
+        // triples: si en el mismo tick un torpedo enemigo iba a chocar con uno propio Y con
+        // otro enemigo, **gana la intercepción del jugador**, porque su bucle corrió primero
+        // y ya lo marcó. Es lo correcto además de lo determinista — el mérito es del jugador,
+        // y la telemetría lo cuenta como intercepción y no como accidente enemigo.
+        var enemies = torpedoes.Where(t => t.Side == TorpedoSide.Enemy)
+                               .OrderBy(t => t.Id.Value).ToList();
+
+        for (var a = 0; a < enemies.Count; a++)
+        for (var b = a + 1; b < enemies.Count; b++)
+        {
+            var first = enemies[a];
+            var second = enemies[b];
+            if (destroyed.Contains(first.Id.Value) || destroyed.Contains(second.Id.Value)) continue;
+            if (Vec2.Distance(first.Position, second.Position) >= _config.HitRadius) continue;
+
+            events.Add(new EnemyTorpedoDestroyed(tick, first.Id.Value, first.Position,
+                DestructionCause.TorpedoCollision));
+            events.Add(new EnemyTorpedoDestroyed(tick, second.Id.Value, second.Position,
+                DestructionCause.TorpedoCollision));
+
+            destroyed.Add(first.Id.Value);
+            destroyed.Add(second.Id.Value);
         }
 
         if (destroyed.Count > 0) torpedoes.RemoveAll(t => destroyed.Contains(t.Id.Value));

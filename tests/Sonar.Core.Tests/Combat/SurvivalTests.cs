@@ -115,8 +115,10 @@ public class SurvivalTests
     }
 
     [Fact]
-    public void EnemyTorpedo_PassesThroughOtherEnemies()
+    public void EnemyTorpedo_StopsAtTheFirstEnemyItCrosses()
     {
+        // Antes este test afirmaba que lo atravesaba. El spec del 2026-08-15 §7 revierte esa
+        // decisión del TDD §4.5: ahora el compañero muere y el torpedo no llega al submarino.
         var sim = TestWorld.Still();
         sim.SetContacts(new[]
         {
@@ -127,13 +129,8 @@ public class SurvivalTests
         var events = new List<GameEvent>();
         for (var i = 0; i < 200; i++) events.AddRange(sim.Tick(NoCommands));
 
-        Assert.Contains(sim.State.Contacts, c => c.Id.Value == 2);
-
-        // Sin esto el test sería vacuo: afirmar que el contacto 2 sigue vivo es
-        // trivialmente cierto si el torpedo nunca existió. El impacto en el submarino
-        // prueba que el torpedo recorrió la línea entera, y el contacto 2 está justo
-        // encima de esa línea.
-        Assert.Contains(events, e => e is SubHit);
+        Assert.DoesNotContain(sim.State.Contacts, c => c.Id.Value == 2);
+        Assert.DoesNotContain(events, e => e is SubHit);
     }
 
     [Fact]
