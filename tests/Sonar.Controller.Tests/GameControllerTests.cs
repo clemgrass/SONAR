@@ -24,6 +24,7 @@ public class GameControllerTests
         EnemyFireStaggerTicks = 70,
         SubHitRadius = 0.045,
         PassiveHearingRadius = 0.46,
+        FriendlyLaneRadius = 0.040,
         DefenseRadius = 0.070,
         DefenseCapacity = 3,
         MagazineSize = 4,

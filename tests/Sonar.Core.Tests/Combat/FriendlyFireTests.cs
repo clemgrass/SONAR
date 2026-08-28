@@ -27,17 +27,22 @@ public class FriendlyFireTests
     [Fact]
     public void AnEnemyTorpedoDestroysAnEnemySubmarineInItsPath()
     {
-        // Revierte el TDD §4.5. El de atrás dispara al origen y el de adelante está justo
-        // sobre esa línea. Se le pone NextFireTick imposible al de adelante para que el
-        // único torpedo del escenario sea el del de atrás.
+        // El accidente real no es disparar a través de un compañero —eso ahora se evita— sino
+        // que el compañero se cruce DESPUÉS del lanzamiento. Por eso el tiro sale con el
+        // carril limpio y el segundo enemigo aparece recién entonces: es exactamente el caso
+        // que el chequeo de carril no puede prever, porque proyecta en línea recta.
         var sim = TestWorld.Still();
+        sim.SetContacts(new[] { Enemy(1, new Vec2(0.0, -0.90), nextFireTick: 0) });
+
+        var events = new List<GameEvent>(sim.Tick(NoCommands));
+        Assert.Contains(events, e => e is EnemyTorpedoFired);
+
         sim.SetContacts(new[]
         {
-            Enemy(1, new Vec2(0.0, -0.90), nextFireTick: 0),
+            sim.State.Contacts.Single(c => c.Id.Value == 1),
             Enemy(2, new Vec2(0.0, -0.50), nextFireTick: int.MaxValue),
         });
 
-        var events = new List<GameEvent>();
         for (var i = 0; i < 400; i++) events.AddRange(sim.Tick(NoCommands));
 
         var killed = Assert.Single(events.OfType<ContactDestroyed>(), e => e.ContactId == 2);

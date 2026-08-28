@@ -73,6 +73,15 @@ public sealed record ReloadCompleted(int Tick, int AmmoLoaded) : GameEvent(Tick)
 
 // --- Amenaza enemiga ---
 public sealed record EnemyTorpedoFired(int Tick, int TorpedoId, int SourceContactId) : GameEvent(Tick);
+
+/// <summary>
+/// Un enemigo estaba listo para disparar y no lo hizo porque tenía un compañero en la línea.
+/// Es invisible en pantalla: sin este evento no hay forma de saber si los enemigos se están
+/// coordinando o si simplemente dejaron de disparar. Se emite <b>muestreado</b>, no en cada
+/// tick, así que sirve para comparar entre oleadas y sesiones, no para contar ocasiones.
+/// </summary>
+public sealed record FireHeldForFriendly(int Tick, int ContactId, int BlockedByContactId)
+    : GameEvent(Tick);
 public sealed record EnemyTorpedoDestroyed(int Tick, int TorpedoId, Vec2 Position,
     DestructionCause Cause) : GameEvent(Tick);
 public sealed record SubHit(int Tick, int HitsTaken) : GameEvent(Tick);

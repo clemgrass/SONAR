@@ -98,7 +98,8 @@ public class SurvivalTests
     [Fact]
     public void EnemyTorpedo_PassesThroughInertContacts()
     {
-        // No hay fuego amigo entre enemigos y los torpedos enemigos ignoran los pecios.
+        // El fuego amigo entre enemigos ya existe (spec 2026-08-15 §7), pero los pecios
+        // siguen siendo inmunes: la anomalía de defensas del §25 los necesita como referencia.
         var sim = TestWorld.Still();
         sim.SetContacts(new[]
         {
@@ -119,14 +120,19 @@ public class SurvivalTests
     {
         // Antes este test afirmaba que lo atravesaba. El spec del 2026-08-15 §7 revierte esa
         // decisión del TDD §4.5: ahora el compañero muere y el torpedo no llega al submarino.
+        //
+        // El compañero entra DESPUÉS del lanzamiento a propósito: con él ya en la línea, el
+        // de atrás aguantaría el tiro y no habría torpedo que probar.
         var sim = TestWorld.Still();
+        sim.SetContacts(new[] { EnemyReadyToFire(1, new Vec2(0.0, -0.90), nextFireTick: 0) });
+
+        var events = new List<GameEvent>(sim.Tick(NoCommands));
         sim.SetContacts(new[]
         {
-            EnemyReadyToFire(1, new Vec2(0.0, -0.90), nextFireTick: 0),
+            sim.State.Contacts.Single(c => c.Id.Value == 1),
             EnemyReadyToFire(2, new Vec2(0.0, -0.50), nextFireTick: int.MaxValue),
         });
 
-        var events = new List<GameEvent>();
         for (var i = 0; i < 200; i++) events.AddRange(sim.Tick(NoCommands));
 
         Assert.DoesNotContain(sim.State.Contacts, c => c.Id.Value == 2);

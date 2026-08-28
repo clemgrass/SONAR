@@ -330,13 +330,26 @@ ahora los enemigos entre ellos.
 
 ### 7.2 El regalo
 
-`[DECIDED]` Ocho enemigos rodeando al jugador significa que **la mayoría se tapan la línea
-entre ellos**. Sólo dispara el que tiene carril limpio.
+`[RETRACTED 2026-08-16]` Esta sección afirmaba que ocho enemigos rodeando al jugador se
+taparían la línea entre ellos, que sólo dispararía el que tuviera carril limpio, y que eso
+**reemplazaba la "manada con turnos"** descartada. **Es falso, y se midió al implementarlo.**
 
-Eso **reemplaza la "manada con turnos"** que se consideró y se descartó: mismo efecto sobre
-la queja original —demasiados disparos simultáneos— sin un planificador inventado, y con una
-consecuencia que da sentido a otra cosa: **el PICKET orbita porque está buscando un carril
-limpio**. Su movimiento deja de ser decorativo.
+En un anillo al mismo radio nadie tapa a nadie: el carril va radial hacia el centro, así que
+el vecino a 45° queda a `R·sin45°` del carril —0.636 para R=0.90— contra un ancho de 0.040. Y
+un enemigo a radio menor tapa apenas un cono de `±asin(0.040/r)`, unos ±4°: un 2% del círculo.
+Con ocho enemigos, la probabilidad de que un tirador esté tapado ronda el 15%, no la mayoría.
+
+`[DECIDED]` **El chequeo de carril se conserva igual**, porque su trabajo principal sí lo
+hace: convierte el fuego amigo de imposible en raro-pero-posible, sin ningún dado.
+
+`[DECIDED]` **Lo que reparte el fuego es otra cosa, y ya está.** La queja original —demasiados
+disparos simultáneos— la resuelven el escalonamiento de entrada relativo a la aparición (§1.1),
+la duda aleatoria por personalidad (§6) que impide que se re-sincronicen, y la receta de oleada
+(§8), que mezcla cadencias distintas e incluye una personalidad que no dispara nunca.
+
+`[ASSUMPTION]` El PICKET orbita por lectura, no por buscar carril: una marca que se mueve
+sobre la banda E se distingue de una que se queda quieta. La justificación anterior no se
+sostiene.
 
 ---
 

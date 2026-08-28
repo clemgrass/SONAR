@@ -44,6 +44,14 @@ public sealed record SimulationConfig
     /// </summary>
     public double PassiveHearingRadius { get; init; }
 
+    /// <summary>
+    /// Ancho del corredor que un enemigo considera bloqueado por un compañero. Arranca en
+    /// HitRadius: evita exactamente aquello con lo que chocaría. Subirlo los vuelve más
+    /// cautos y baja el volumen de fuego; bajarlo produce más accidentes. Es la perilla con
+    /// la que se afina qué tan raro resulta el fuego amigo.
+    /// </summary>
+    public double FriendlyLaneRadius { get; init; }
+
     public double DefenseRadius { get; init; }
     public int DefenseCapacity { get; init; }
 
@@ -68,6 +76,7 @@ public sealed record SimulationConfig
         Positive(NearMissRadius, nameof(NearMissRadius));
         Positive(SubHitRadius, nameof(SubHitRadius));
         Positive(PassiveHearingRadius, nameof(PassiveHearingRadius));
+        Positive(FriendlyLaneRadius, nameof(FriendlyLaneRadius));
         Positive(DefenseRadius, nameof(DefenseRadius));
         Positive(DeadZoneRadius, nameof(DeadZoneRadius));
 

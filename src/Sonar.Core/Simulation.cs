@@ -178,6 +178,19 @@ public sealed class Simulation : ISimulation
                 if (range > contact.Personality.FiringRadius) continue;
             }
 
+            // No dispara a través de un compañero. Se mide contra EstimatedCentre y no
+            // contra EstimatedSubPosition a propósito: la segunda sortea el jitter de
+            // puntería, y gastarlo en un disparo que no ocurre acoplaría el generador de
+            // azar a la geometría. El enemigo planifica su carril contra la puntería que
+            // pretende tener; el jitter es el error del tiro real, que no conoce.
+            if (LaneIsBlocked(contact, EstimatedCentre(contact, state.Tick, worldDrift, dt),
+                              contacts, torpedoes, worldDrift, out var blockedBy))
+            {
+                if (state.Tick % HeldFireSampleTicks == 0)
+                    events.Add(new FireHeldForFriendly(state.Tick, contact.Id.Value, blockedBy));
+                continue;
+            }
+
             // Uno a la vez: hasta que el suyo se resuelva —impacte, lo intercepten o salga
             // del arena— este enemigo no vuelve a disparar.
             if (torpedoes.Any(t => t.Side == TorpedoSide.Enemy
@@ -198,6 +211,82 @@ public sealed class Simulation : ISimulation
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// Cada cuántos ticks se muestrea el aviso de fuego contenido. Un enemigo puede pasar
+    /// cientos de ticks con el carril tapado y no hace falta una línea por cada uno para
+    /// saber que ocurre: el contador es relativo, sirve para comparar oleadas y sesiones.
+    /// </summary>
+    private const int HeldFireSampleTicks = 60;
+
+    /// <summary>
+    /// ¿Hay un compañero en la línea de tiro? Los enemigos se conocen perfectamente, así que
+    /// no se disparan entre ellos a propósito: si el carril está tapado, aguantan y vuelven a
+    /// mirar el tick siguiente.
+    ///
+    /// La proyección es <b>lineal</b> — estima dónde va a estar el compañero cuando el torpedo
+    /// pase por su altura, suponiendo que sigue derecho. Pero los cascos con personalidad
+    /// viran hacia su radio preferido, así que la predicción falla de vez en cuando y ahí es
+    /// donde ocurre el accidente. Eso es exactamente lo que se busca: fuego amigo raro, y por
+    /// una razón física en vez de por un dado.
+    ///
+    /// <b>No ordena la presión por sí solo, y conviene no creer lo contrario.</b> El spec
+    /// afirmaba que ocho enemigos rodeando al jugador se taparían entre ellos; medido, es
+    /// falso: en un anillo al mismo radio el vecino a 45° queda a 0.636 de un carril de 0.040
+    /// de ancho, y un enemigo cercano tapa apenas un cono de ±4°, un 2% del círculo. Bloquear
+    /// pasa de vez en cuando, no la mayoría de las veces. Lo que sí reparte el fuego es el
+    /// escalonamiento de entrada, la duda por personalidad y la receta de oleada.
+    /// </summary>
+    private bool LaneIsBlocked(
+        Contact shooter, Vec2 target, List<Contact> contacts, List<Torpedo> torpedoes,
+        Vec2 worldDrift, out int blockedBy)
+    {
+        blockedBy = -1;
+
+        var lane = target - shooter.Position;
+        var length = lane.Length;
+        if (length < 1e-9) return false;
+
+        var direction = lane * (1.0 / length);
+
+        bool Blocks(Vec2 position, Vec2 velocity)
+        {
+            // Distancia a lo largo del carril hasta el punto más cercano, acotada al tramo.
+            var toIt = position - shooter.Position;
+            var along = toIt.X * direction.X + toIt.Y * direction.Y;
+            if (along <= 0.0 || along >= length) return false;
+
+            // Cuándo llegaría el torpedo a esa altura, y dónde estaría el compañero entonces.
+            var seconds = along / _config.EnemyTorpedoSpeed;
+            var projected = position + (velocity + worldDrift) * seconds;
+
+            var toProjected = projected - shooter.Position;
+            var alongProjected = toProjected.X * direction.X + toProjected.Y * direction.Y;
+            var onLane = shooter.Position + direction * alongProjected;
+
+            return Vec2.Distance(projected, onLane) < _config.FriendlyLaneRadius;
+        }
+
+        foreach (var other in contacts)
+        {
+            if (!other.Alive || other.Kind != ContactKind.Enemy) continue;
+            if (other.Id.Value == shooter.Id.Value) continue;
+            if (!Blocks(other.Position, other.Velocity)) continue;
+            blockedBy = other.Id.Value;
+            return true;
+        }
+
+        foreach (var torpedo in torpedoes)
+        {
+            if (torpedo.Side != TorpedoSide.Enemy) continue;
+            if (torpedo.SourceContactId == shooter.Id.Value) continue;
+            if (!Blocks(torpedo.Position, torpedo.Direction * torpedo.Speed - worldDrift)) continue;
+            blockedBy = torpedo.SourceContactId;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
