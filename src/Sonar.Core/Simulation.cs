@@ -112,6 +112,9 @@ public sealed class Simulation : ISimulation
         //      llegan las dos cosas, la causa reportada sea la que ya te había matado.
         sub = ResolveContactCollisions(sub, contacts, events, state.Tick);
 
+        // 9c · Ruido de aproximación de lo que mata por contacto
+        WarnAboutRammingRuns(contacts, events, state.Tick);
+
         // 10 · Barrido y registro de lecturas
         var sonar = AdvanceSweepAndRecord(state.Sonar, contacts, state.Tick, dt, events);
 
@@ -211,6 +214,32 @@ public sealed class Simulation : ISimulation
         }
 
         return state;
+    }
+
+    /// <summary>Cada cuántos ticks se repite el aviso de embestida. Tres segundos: redoble,
+    /// no ráfaga — el registro del juego está paceado y una línea por tick lo ahogaría.</summary>
+    private const int RamWarningIntervalTicks = 180;
+
+    /// <summary>
+    /// Fase 9c · El ruido de aproximación del que mata por contacto. Sin esto, la muerte por
+    /// embestida llega desde una marca que el jugador vio hace siete segundos y se siente
+    /// como una trampa. Una embestida siempre suena: no es una perilla, es la regla que
+    /// impide que mate con algo que no se pudo anticipar.
+    /// </summary>
+    private void WarnAboutRammingRuns(List<Contact> contacts, List<GameEvent> events, int tick)
+    {
+        if (tick % RamWarningIntervalTicks != 0) return;
+
+        foreach (var contact in contacts)
+        {
+            if (!contact.Alive || contact.Personality is null) continue;
+            if (!contact.Personality.Rams) continue;
+
+            var distance = contact.Position.Length;
+            if (distance > _config.PassiveHearingRadius) continue;
+
+            events.Add(new RammingRunDetected(tick, contact.Id.Value, distance));
+        }
     }
 
     /// <summary>

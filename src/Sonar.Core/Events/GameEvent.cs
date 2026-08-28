@@ -82,6 +82,15 @@ public sealed record EnemyTorpedoFired(int Tick, int TorpedoId, int SourceContac
 /// </summary>
 public sealed record FireHeldForFriendly(int Tick, int ContactId, int BlockedByContactId)
     : GameEvent(Tick);
+
+/// <summary>
+/// Un contacto que mata por contacto está lo bastante cerca como para oírse acelerar. Lleva
+/// distancia y no marcación a propósito: el jugador tiene que ir al scope a averiguar
+/// <b>cuál</b> de las marcas viene por él. Un aviso que ya trae el rumbo resuelve el problema
+/// en vez de plantearlo.
+/// </summary>
+public sealed record RammingRunDetected(int Tick, int ContactId, double Distance)
+    : GameEvent(Tick);
 public sealed record EnemyTorpedoDestroyed(int Tick, int TorpedoId, Vec2 Position,
     DestructionCause Cause) : GameEvent(Tick);
 public sealed record SubHit(int Tick, int HitsTaken) : GameEvent(Tick);

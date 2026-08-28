@@ -365,6 +365,11 @@ public partial class Main : Node
                 break;
             case EnemyTorpedoFired: Instrument("LAUNCH TRANSIENT"); break;
             case EnemyTorpedoDestroyed: Instrument("INBOUND NEUTRALISED"); break;
+            // Salta la cola como los impactos: un aviso de embestida que llega paceado,
+            // detrás de ocho líneas de registro, llega tarde para lo único que sirve.
+            case RammingRunDetected e:
+                _eventLog.WriteNow(Dim, $"  !! FAST SCREWS CLOSING · RANGE {e.Distance:F2}");
+                break;
             case SubHit e: _eventLog.WriteNow(Dim, $"  WE ARE HIT · {e.HitsTaken}/2"); break;
             case SubDestroyed e:
                 _lastDeathCause = e.Cause.ToString();
