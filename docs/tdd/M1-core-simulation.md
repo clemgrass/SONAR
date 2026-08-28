@@ -430,12 +430,22 @@ colocan pecio y defensa en el mismo punto.
 
 ### 4.5 Colisiones de torpedos enemigos
 
-`[DECIDED]` Un torpedo `Enemy` **no daña a los contactos**. No hay fuego amigo entre enemigos, y
-tampoco atraviesa contactos inertes: los ignora por completo.
+`[DECIDED 2026-08-16]` **Un torpedo `Enemy` sí daña a otros enemigos.** Esto revierte la
+decisión anterior, que lo prohibía por completo; el spec del
+[2026-08-15](../superpowers/specs/2026-08-15-enemy-ai-design.md) §7 explica por qué.
 
-Razón: modelar fuego amigo enemigo abre una lata de gusanos de IA (evitar la línea de tiro,
-reposicionarse) que no aporta nada a lo que M1 mide, y crea situaciones donde el jugador gana sin
-hacer nada.
+La razón original era buena: modelar fuego amigo abre la lata de gusanos de evitar la línea de
+tiro y reposicionarse. Lo que cambió es que esa lata **se abrió a propósito** — evitar el carril
+es ahora una regla del diseño, no un costo accidental, y es lo que hace el fuego amigo raro sin
+recurrir a un dado. Los enemigos no disparan a través de un compañero; el accidente ocurre
+porque ese chequeo proyecta en línea recta mientras los cascos viran.
+
+Sigue en pie la otra mitad del temor original —que el jugador gane sin hacer nada— y por eso
+importa el contador `torpedoCollision` de la telemetría: si los enemigos se matan solos con
+frecuencia, se ve en los datos antes que en una queja.
+
+**Los pecios siguen siendo inmunes.** La anomalía de defensas del §25 necesita que ese pecio
+sobreviva como referencia observable.
 
 Un torpedo `Enemy` **sí** es destruido por una defensa (§4.4) y **sí** puede chocar con un torpedo
 `Own`. En ambos casos se destruyen los dos, lo cual es exactamente el §24 del GDD.

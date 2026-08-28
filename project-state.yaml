@@ -39,6 +39,7 @@ progress:
   plan_5_gauntlet_rules: done      # 10/10 tareas, 295 tests
   plan_6_watch_and_telemetry: done   # 10/10 tareas
   plan_7_enemy_mind: done            # 11/11 + una tarea 12 que salió al cerrar; 336 tests
+  plan_8_held_fire_and_telemetry: done  # 8/8; 352 tests. Falta sólo conectar el remoto
 
 systems:
   spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
@@ -47,7 +48,7 @@ systems:
   entities: done
   tick_loop: done
   combat: done
-  enemy_threat: done               # personalidades como datos, puntería por ruido, movimiento gobernado
+  enemy_threat: done               # personalidades, puntería por ruido, gobierno, fuego amigo evitado
   wave_gauntlet: done              # oleadas dobladoras, spawns de borde, START y RETRY
   shot_telemetry: done             # ShotAssessed en Core, JSONL incremental en Game
   sonar_gating: done               # cruce de barrido + lecturas con gating

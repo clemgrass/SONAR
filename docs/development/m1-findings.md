@@ -146,3 +146,57 @@ Los dos que más enseñan:
 
 - [ ] Pendiente de playtest: ¿la bimodalidad se mantiene con varios enemigos?
 - [ ] Pendiente de playtest: ¿se distinguen las personalidades mirando el scope?
+
+### 2026-08-16 — plan 8: fuego contenido, embestida y telemetría
+
+Ocho tareas. Los enemigos ahora pueden matarse entre ellos, no se disparan a través de un
+compañero, el que embiste avisa antes de llegar, y la telemetría distingue por personalidad.
+352 tests.
+
+**Lo más importante de esta medición es que no midió nada.** Los cinco contadores nuevos dan
+cero en las cinco semillas, y el baseline sin input es idéntico al del plan 7:
+
+| Contador | Valor en las 5 semillas |
+|---|---|
+| Fuego contenido por compañero | 0 |
+| Muertes por fuego amigo | 0 |
+| Torpedos perdidos en choques | 0 |
+| Avisos de embestida | 0 |
+
+La razón es correcta y conviene entenderla: **sin input sólo entra la oleada 1, que es un solo
+STALKER.** Con un enemigo no hay compañero que tapar el carril, no hay a quién matar por
+error, no hay torpedos que se crucen, y el RAM no aparece hasta la oleada 4. Todo el plan 8
+vive en oleadas que el baseline sin input no alcanza.
+
+`[OPEN]` **El plan 8 está sin validar en su conjunto.** Sus reglas están probadas en tests
+unitarios con escenarios construidos a mano, pero ninguna se ha visto ocurrir en una partida.
+Hace falta jugar, o un bot que dispare, para llegar a la oleada 2 y más allá.
+
+**Una afirmación de diseño retirada.** El spec §7.2 decía que ocho enemigos rodeando al
+jugador se taparían la línea entre ellos, y con eso justifiqué descartar la manada con turnos.
+Medido al implementarlo, es falso: en un anillo al mismo radio el carril va radial hacia el
+centro, así que el vecino a 45° queda a `R·sin45°` —0.636 para R=0.90— contra un corredor de
+0.040 de ancho. Un enemigo más cercano tapa apenas un cono de ±4°, un 2% del círculo. Con
+ocho enemigos la probabilidad de estar tapado ronda el 15%: ocurre de vez en cuando, no la
+mayoría de las veces.
+
+El chequeo se queda porque su trabajo principal sí lo hace —convierte el fuego amigo de
+imposible en raro-pero-posible, sin dados— pero **no ordena la presión**. Lo que sí reparte el
+fuego, y ya estaba, es el escalonamiento de entrada, la duda por personalidad y la receta de
+oleada.
+
+**Un defecto funcional que encontró el cierre del plan 7.** `FiringRadius` se escribía, se
+poblaba en las cinco personalidades y se testeaba — y nadie lo leía. El RAM disparaba torpedos
+cuando su diseño entero es no disparar, y el STALKER tiraba desde el borde en vez de cerrar
+primero, lo que vaciaba de sentido el ciclo de acecho. Los tests no podían verlo: afirmaban
+que el dato era correcto, no que alguien lo usara.
+
+El arreglo obvio habría sido peor. El gobierno se acerca al radio preferido de forma asintótica
+**desde afuera** —medido: PICKET converge a 0.900000000 sin cruzar— así que un radio de tiro
+igual al preferido significa que esa personalidad no dispara nunca. Los radios de compromiso
+quedaron por encima de los preferidos, con la razón escrita en el campo.
+
+- [ ] Pendiente de playtest: ¿ocurre alguna vez el fuego amigo, y se lee como accidente?
+- [ ] Pendiente de playtest: ¿el aviso del RAM llega con tiempo para reaccionar?
+- [ ] Pendiente de playtest: ¿se distinguen las personalidades mirando el scope?
+

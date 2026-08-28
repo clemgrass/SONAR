@@ -464,3 +464,29 @@ milestone.
 
 Si la respuesta a la pregunta 1 resulta negativa, M1 está igualmente completo: cumplió su
 función, que era avisar a tiempo y barato.
+
+## Lo que agregó la IA enemiga (2026-08-16)
+
+**El HUD de munición cambió de forma.** Antes decía `ammo 3/12`, que se leía como "te quedan
+3 de 12" cuando en realidad son tres en los tubos y doce en la santabárbara: dos números sin
+relación separados por una barra que inventaba una. Ahora:
+
+```
+tubes ***    reserve 12
+```
+
+Los puntos dicen cuántos tubos hay listos sin obligar a leer un número. La capacidad se lee de
+`config.MagazineSize`, no de una constante — el archivo de configuración existe justamente para
+que ese número se pueda retocar sin tocar código.
+
+**Dos eventos nuevos que la escena consume:**
+
+| Evento | Qué hace la escena |
+|---|---|
+| `RammingRunDetected(Tick, ContactId, Distance)` | `!! FAST SCREWS CLOSING · RANGE 0.31`, **saltando la cola** del registro como los impactos. Un aviso de embestida que llega paceado, detrás de ocho líneas, llega tarde para lo único que sirve. Lleva distancia y no marcación a propósito: el jugador tiene que ir al scope a averiguar cuál de las marcas viene por él |
+| `FireHeldForFriendly(Tick, ContactId, BlockedByContactId)` | **No se muestra.** Es sólo telemetría: mide si los enemigos se están cuidando entre ellos, que es invisible en pantalla por definición |
+
+**Cuatro líneas nuevas en el JSONL:** `enemyFire` y `kill` ganaron una columna `personality`,
+y entraron `heldFire`, `ramClosing` y `torpedoCollision`. Con cinco personalidades y unos
+veinte testers, sin la columna de personalidad los datos son el promedio de cinco cosas
+distintas.
