@@ -205,7 +205,8 @@ public sealed class Simulation : ISimulation
             var target = EstimatedSubPosition(contact, state.Tick, worldDrift, dt);
             torpedoes.Add(Torpedo.CreateEnemyToward(new TorpedoId(id), contact.Position,
                 target, _config.EnemyTorpedoSpeed, contact.Id.Value));
-            events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value));
+            events.Add(new EnemyTorpedoFired(state.Tick, id, contact.Id.Value,
+                contact.Personality?.Name));
 
             contacts[i] = contact with
             {
@@ -452,7 +453,7 @@ public sealed class Simulation : ISimulation
                     torpedo.Side == TorpedoSide.Enemy
                         ? DestructionCause.FriendlyFire
                         : DestructionCause.DirectHit,
-                    torpedo.Id.Value));
+                    torpedo.Id.Value, contact.Personality?.Name));
                 torpedoes.RemoveAt(t);
                 break;
             }
@@ -567,7 +568,7 @@ public sealed class Simulation : ISimulation
 
                 contacts[c] = contact with { Alive = false };
                 events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
-                    DestructionCause.Defense));
+                    DestructionCause.Defense, TorpedoId: -1, contact.Personality?.Name));
                 destroyed++;
             }
 
@@ -620,7 +621,7 @@ public sealed class Simulation : ISimulation
                 {
                     contacts[c] = contact with { Alive = false };
                     events.Add(new ContactDestroyed(tick, contact.Id.Value, contact.Position,
-                        DestructionCause.Blast, torpedo.Id.Value));
+                        DestructionCause.Blast, torpedo.Id.Value, contact.Personality?.Name));
                     killed = true;
                 }
                 else if (distance < nearestSurvivor)

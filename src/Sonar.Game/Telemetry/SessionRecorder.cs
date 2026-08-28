@@ -99,7 +99,8 @@ public sealed class SessionRecorder
                 _waveKills++;
                 _writer.Write(new JsonLine("kill")
                     .Add("tick", e.Tick).Add("contact", e.ContactId)
-                    .Add("cause", e.Cause.ToString()).Add("torpedo", e.TorpedoId));
+                    .Add("cause", e.Cause.ToString()).Add("torpedo", e.TorpedoId)
+                    .Add("personality", e.Personality ?? "none"));
                 break;
 
             case TorpedoDetonated e:
@@ -144,6 +145,38 @@ public sealed class SessionRecorder
 
             case SubHit e:
                 _writer.Write(new JsonLine("hit").Add("tick", e.Tick).Add("taken", e.HitsTaken));
+                break;
+
+            case EnemyTorpedoFired e:
+                _writer.Write(new JsonLine("enemyFire")
+                    .Add("tick", e.Tick).Add("torpedo", e.TorpedoId)
+                    .Add("contact", e.SourceContactId)
+                    .Add("personality", e.Personality ?? "none"));
+                break;
+
+            // El que dice si la coordinación entre enemigos funciona. Es invisible en
+            // pantalla: sin medirlo no hay forma de distinguir "se están cuidando entre
+            // ellos" de "dejaron de disparar". Va muestreado cada 60 ticks, así que es un
+            // contador RELATIVO — sirve para comparar oleadas y sesiones, no para contar
+            // ocasiones.
+            case FireHeldForFriendly e:
+                _writer.Write(new JsonLine("heldFire")
+                    .Add("tick", e.Tick).Add("contact", e.ContactId)
+                    .Add("blockedBy", e.BlockedByContactId));
+                break;
+
+            case RammingRunDetected e:
+                _writer.Write(new JsonLine("ramClosing")
+                    .Add("tick", e.Tick).Add("contact", e.ContactId).Add("range", e.Distance));
+                break;
+
+            // Cuántos torpedos mueren chocando con otro. Con enemigos que fallan, el agua se
+            // llena de torpedos cruzando en diagonal y esto deja de ser una rareza: hay que
+            // saber cuántos de los del jugador se pierden así antes de que alguien lo reporte
+            // como "me desapareció el tiro".
+            case EnemyTorpedoDestroyed e when e.Cause == DestructionCause.TorpedoCollision:
+                _writer.Write(new JsonLine("torpedoCollision")
+                    .Add("tick", e.Tick).Add("torpedo", e.TorpedoId));
                 break;
         }
     }

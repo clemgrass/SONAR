@@ -28,7 +28,7 @@ public sealed record TorpedoDetonated(int Tick, Vec2 Position, bool HitSomething
 /// Sirve para unir un disparo con lo que le pasó al analizar la telemetría.
 /// </summary>
 public sealed record ContactDestroyed(int Tick, int ContactId, Vec2 Position,
-    DestructionCause Cause, int TorpedoId = -1) : GameEvent(Tick);
+    DestructionCause Cause, int TorpedoId = -1, string? Personality = null) : GameEvent(Tick);
 
 /// <summary>
 /// Detonación que no destruyó nada pero cayó cerca de un contacto vivo. No tiene efecto en M1:
@@ -72,7 +72,8 @@ public sealed record ReloadStarted(int Tick) : GameEvent(Tick);
 public sealed record ReloadCompleted(int Tick, int AmmoLoaded) : GameEvent(Tick);
 
 // --- Amenaza enemiga ---
-public sealed record EnemyTorpedoFired(int Tick, int TorpedoId, int SourceContactId) : GameEvent(Tick);
+public sealed record EnemyTorpedoFired(int Tick, int TorpedoId, int SourceContactId,
+    string? Personality = null) : GameEvent(Tick);
 
 /// <summary>
 /// Un enemigo estaba listo para disparar y no lo hizo porque tenía un compañero en la línea.
