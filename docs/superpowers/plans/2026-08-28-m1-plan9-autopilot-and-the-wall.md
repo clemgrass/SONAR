@@ -2628,6 +2628,12 @@ Agrégalos en `Main.cs`, antes de `_Notification`:
         if (_demoReported) return;
         _demoReported = true;
         GD.Print(_demo!.BuildReport().Render());
+
+        // Sin ventana no hay nadie mirando el scope congelado y el proceso quedaría corriendo
+        // para siempre, que es lo que hace imposible verificar la demo desde un script. Con
+        // ventana se deja abierto a propósito: el instante de la muerte es justamente lo que
+        // hay que poder mirar con calma.
+        if (DisplayServer.GetName() == "headless") GetTree().Quit(0);
     }
 ```
 

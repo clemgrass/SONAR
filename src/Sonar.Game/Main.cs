@@ -7,6 +7,7 @@ using Sonar.Core;
 using Sonar.Core.Entities;
 using Sonar.Core.Events;
 using Sonar.Core.Spatial;
+using Sonar.Autopilot;
 using Sonar.Game.Telemetry;
 
 namespace Sonar.Game;
@@ -44,6 +45,19 @@ public partial class Main : Node
     private bool _runEndRecorded;
     private string _lastDeathCause = "Unknown";
 
+    // --- Modo demo: `godot-mono --path src/Sonar.Game -- --demo` ---
+    private AutopilotRun? _demo;
+    private double _demoSpeed = 1.0;
+    private double _demoAccumulator;
+    private bool _demoReported;
+
+    /// <summary>
+    /// Tope de ticks por frame en modo demo. Diez segundos de juego: suficiente para
+    /// cualquier velocidad de reproducción razonable, y bajo para que un frame trabado no
+    /// congele la ventana mientras la simulación se pone al día.
+    /// </summary>
+    private const int MaxDemoTicksPerFrame = 600;
+
     public override void _Ready()
     {
         _sonar = GetNode<SonarView>("%SonarView");
@@ -58,14 +72,32 @@ public partial class Main : Node
         _sonar.SetGeometry(config.DeadZoneRadius, config.BandOuterRadii.ToArray(),
             config.SweepPeriodSeconds / config.TickDurationSeconds);
 
+        // Las banderas se leen acá y no más abajo porque la semilla tiene que estar decidida
+        // antes de construir el controller.
+        var args = OS.GetCmdlineUserArgs();
+        var seed = (int)ArgValue(args, "--seed=", Seed);
+
         // El director de oleadas vive dentro del GameController: acá sólo se le da rumbo y
         // avance, y él coloca los contactos cuando toca.
-        _controller = new GameController(config, Seed, Course, SubSpeed);
+        _controller = new GameController(config, seed, Course, SubSpeed);
 
         _telemetry = new TelemetryWriter(config, DisplayServer.WindowGetSize());
         _recorder = new SessionRecorder(_telemetry);
         _recorder.RunStarted(_controller.Attempt, _controller.Seed);
         _recordedAttempt = _controller.Attempt;
+
+        // El modo demo y el autotest del terminal son excluyentes: el primero teclea por el
+        // piloto y el segundo inyecta teclas para comprobar que el LineEdit las recibe.
+        if (System.Array.IndexOf(args, "--demo") >= 0)
+        {
+            var pace = ArgValue(args, "--pace=", 1.5);
+            _demoSpeed = ArgValue(args, "--speed=", 1.0);
+            _demo = new AutopilotRun(config, _controller, pace);
+            _demo.CommandEmitted += OnAutopilotCommand;
+            _recorder.Pilot(pace);
+            _eventLog.WriteNow(Dim,
+                $"AUTOPILOT · SEED {seed} · PACE {pace:F1}S · SPEED X{_demoSpeed:F0}");
+        }
 
         _input.TextSubmitted += OnCommandSubmitted;
         _input.TextChanged += OnTextChanged;
@@ -215,7 +247,8 @@ public partial class Main : Node
 
         // Los eventos son cosas que pasaron y se consumen una vez; el snapshot es cómo
         // está el mundo ahora y se puede leer siempre. Ese orden importa.
-        foreach (var evt in _controller.Advance(delta)) Report(evt);
+        if (_demo is not null) AdvanceDemo(delta);
+        else foreach (var evt in _controller.Advance(delta)) Report(evt);
         _eventLog.Advance(delta);
 
         // El terminal siempre tiene que estar listo para escribir, sin tener que tocarlo.
@@ -387,6 +420,86 @@ public partial class Main : Node
     private const string Typed = "#fde047";   // registro de comando
 
     private void Instrument(string text) => _eventLog.Queue(Dim, $"  {text}");
+
+    /// <summary>
+    /// Valor numérico de una bandera `--clave=valor`, o el default. En cultura invariante:
+    /// con la configuración regional de Chile el separador decimal es la coma y `--pace=1.5`
+    /// se leería como 15.
+    /// </summary>
+    private static double ArgValue(string[] args, string prefix, double fallback)
+    {
+        foreach (var arg in args)
+        {
+            if (!arg.StartsWith(prefix)) continue;
+            if (double.TryParse(arg[prefix.Length..],
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value))
+                return value;
+        }
+        return fallback;
+    }
+
+    /// <summary>
+    /// Avanza la corrida pilotada tick a tick, no con el delta del frame. El piloto decide por
+    /// número de tick, así que un frame perdido hace la simulación más lenta pero nunca
+    /// distinta: lo que se mira acá es exactamente la corrida que afirma TheWallTests.
+    /// </summary>
+    private void AdvanceDemo(double delta)
+    {
+        if (_demo!.Finished)
+        {
+            ReportDemoOnce();
+            return;
+        }
+
+        _demoAccumulator += delta * _demoSpeed;
+
+        var executed = 0;
+        while (_demoAccumulator >= _tickDuration && executed < MaxDemoTicksPerFrame)
+        {
+            _demoAccumulator -= _tickDuration;
+            executed++;
+
+            _demo.StepOneTick();
+
+            // Los eventos del tick que acaba de correr. StepOneTick llama a Advance por
+            // dentro, así que hay que leerlos de LastEvents en vez de recibirlos.
+            foreach (var evt in _controller.LastEvents) Report(evt);
+
+            if (_demo.Finished) break;
+        }
+
+        if (_demoAccumulator >= _tickDuration) _demoAccumulator = 0;
+    }
+
+    /// <summary>
+    /// El comando del bot entra por el mismo camino que uno tecleado: el registro y la
+    /// telemetría no distinguen quién lo escribió, y eso es lo que hace que las corridas
+    /// pilotadas entren al mismo corpus que las de los testers.
+    ///
+    /// NO se llama a _metrics.NoteSubmit(): SessionMetrics mide tiempo de composición humano,
+    /// y un comando de cero segundos envenenaría el promedio de la pregunta 2 de M1. Los
+    /// disparos y las muertes sí se cuentan, porque esos sí son reales — pasan por Report.
+    /// </summary>
+    private void OnAutopilotCommand(int tick, string text)
+    {
+        _eventLog.Queue(Typed, $"> {text}");
+        _recorder.Command(tick, text, true, 0.0);
+    }
+
+    /// <summary>El reporte va a consola una sola vez, con el scope congelado en la muerte.</summary>
+    private void ReportDemoOnce()
+    {
+        if (_demoReported) return;
+        _demoReported = true;
+        GD.Print(_demo!.BuildReport().Render());
+
+        // Sin ventana no hay nadie mirando el scope congelado y el proceso quedaría corriendo
+        // para siempre, que es lo que hace imposible verificar la demo desde un script. Con
+        // ventana se deja abierto a propósito: el instante de la muerte es justamente lo que
+        // hay que poder mirar con calma.
+        if (DisplayServer.GetName() == "headless") GetTree().Quit(0);
+    }
 
     // Cerrar la ventana y detener desde el editor no disparan la misma notificación, y una
     // sesión medida que no se guarda es una sesión perdida. WriteReport es idempotente.

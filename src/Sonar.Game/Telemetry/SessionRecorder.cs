@@ -26,6 +26,14 @@ public sealed class SessionRecorder
     public void RunStarted(int attempt, int seed) =>
         _writer.Write(new JsonLine("run").Add("n", attempt).Add("seed", seed));
 
+    /// <summary>
+    /// Marca la corrida como pilotada por el bot y con qué presupuesto. Sin esta línea, las
+    /// corridas del bot y las de las personas se mezclarían en el mismo corpus y nadie podría
+    /// separarlas después — que es justo lo que arruinaría la pregunta 2.
+    /// </summary>
+    public void Pilot(double paceSeconds) =>
+        _writer.Write(new JsonLine("pilot").Add("pace", paceSeconds));
+
     public void RunEnded(int attempt, int tick, string cause, int wave,
         int liveEnemies, int ammoLoaded, int ammoReserve, int defenses)
     {
