@@ -1701,7 +1701,7 @@ namespace Sonar.Autopilot;
 /// El piloto decide por número de tick, no por frame: un frame perdido en Godot hace la
 /// simulación más lenta, nunca distinta.
 /// </summary>
-public sealed class PilotRun
+public sealed class AutopilotRun
 {
     /// <summary>Tick y texto de cada comando. Godot lo engancha para escribirlo en el registro.</summary>
     public event Action<int, string>? CommandEmitted;
