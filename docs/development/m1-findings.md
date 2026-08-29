@@ -200,3 +200,58 @@ quedaron por encima de los preferidos, con la razón escrita en el campo.
 - [ ] Pendiente de playtest: ¿el aviso del RAM llega con tiempo para reaccionar?
 - [ ] Pendiente de playtest: ¿se distinguen las personalidades mirando el scope?
 
+### 2026-08-28 — plan 9: el piloto automático encuentra una pared que no es la esperada
+
+Primera vez que alguien —o algo— ve las oleadas 2, 3 y 4 de este juego. El bot juega con el
+mismo snapshot que el jugador: lecturas envejecidas y con gating, sin acceso a la verdad del
+mundo. No recibe el `GameController`, así que hacer trampa no compila.
+
+`[ASSUMPTION]` Presupuesto de un comando cada 1,5 s. La pregunta 2 sigue sin responder, así
+que es una perilla declarada, no un dato.
+
+`[ASSUMPTION]` El bot asocia lecturas por id de contacto; una persona asocia por cercanía y a
+veces se equivoca de blanco. Eso lo hace una **cota superior**: nadie va a superar esta pared.
+
+**El hallazgo: la corrida no la decide el ritmo, la decide el pañol.**
+
+| Semilla | Disparos por oleada | Total | Final |
+|---|---|---|---|
+| 20260811 | 2 · 4 · 8 · 1 | **15** | muere en la oleada 4, por embestida, tick 10 526 |
+| 11111111 | 1 · 5 · 7 · 2 | **15** | muere en la oleada 4, por embestida, tick 11 344 |
+| 22222222 | 7 · 7 · 1 | **15** | **no muere**: 53 593 ticks a la deriva en la oleada 3 |
+| 33333333 | 7 · 8 | **15** | **no muere**: 55 454 ticks a la deriva en la oleada 2 |
+| 44444444 | 7 · 6 · 2 | **15** | **no muere**: 53 757 ticks a la deriva en la oleada 3 |
+
+Las cinco terminan con **exactamente quince tiros**, que es todo lo que hay:
+`magazineSize` 3 más `ammoReserve` 12. Ninguna corrida se acaba porque el jugador no diera
+abasto — se acaban porque se quedó sin torpedos. Medido en el diagnóstico: con el pañol en
+cero, el piloto seguía teniendo soluciones de tiro válidas con errores de 0,005 a 0,066, todas
+muy dentro del radio de explosión de 0,100. **Veía los blancos y no tenía con qué.**
+
+**Pregunta 7 — ¿la munición aprieta? Respondida, y de más:** no aprieta, estrangula. Es la
+restricción que decide las cinco corridas antes que cualquier otra cosa.
+
+**Pregunta 8 — ¿la fase extrema se dispara o se sobrevive?** Ninguna de las dos. Con el pañol
+vacío y la defensa todavía disponible, el submarino entra en un limbo: no puede matar y casi
+no puede morir. Tres de cinco semillas se quedaron ahí quince minutos de reloj de juego.
+
+**La defensa es dominante.** `defenseCapacity: 1` es un límite de **concurrencia**, no de
+inventario: se puede volver a poner una apenas explota la anterior. Medido en la oleada 3 de
+la semilla 44444444: **168 amenazas absorbidas** con esa única ranura reutilizable. Al
+desactivar la defensa en el piloto, las cinco semillas mueren, tres de ellas ahogadas — y la
+20260811 muere en la oleada 4 con el índice de saturación en 4,00 y seis enemigos vivos.
+
+O sea que la pared existe y se puede ver; hoy está tapada por dos cosas a la vez, y las dos
+son perillas de diseño, no defectos del código:
+
+| Perilla | Qué produce hoy |
+|---|---|
+| `ammoReserve` 12 | La corrida se acaba a los quince tiros, siempre |
+| `defenseCapacity` como concurrencia | Con el pañol vacío, el jugador es casi inmortal |
+
+**Las muertes que sí ocurren son por embestida, no por torpedo.** Las dos semillas que mueren
+lo hacen con causa `Collision`, en la oleada 4, que es donde entra el RAM. Con el pañol vacío
+el RAM no tiene oposición posible.
+
+`[OPEN]` Qué se ajusta —el pañol, la defensa, o ninguno porque el limbo es información
+suficiente— es decisión de diseño y no la toma este plan.
