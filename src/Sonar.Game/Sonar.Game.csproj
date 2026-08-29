@@ -13,6 +13,7 @@
        compila desde Godot. -->
   <ItemGroup>
     <ProjectReference Include="..\Sonar.Controller\Sonar.Controller.csproj" />
+    <ProjectReference Include="..\Sonar.Autopilot\Sonar.Autopilot.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- El piloto conoce al Controller; el Controller no lo conoce a él. El bot es un
+       instrumento de medición: la capa medida no debe poder nombrarlo. Y como toda la
+       cadena, este proyecto NO referencia Godot. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sonar.Controller\Sonar.Controller.csproj" />
+  </ItemGroup>
+
+</Project>
