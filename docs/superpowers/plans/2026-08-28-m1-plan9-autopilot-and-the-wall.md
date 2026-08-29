@@ -509,6 +509,13 @@ que deje al blanco más cerca del punto de detonación.
 
 Con la config de hoy los vuelos son 2,1 / 6,3 / 10,5 / 14,7 / 18,8 s para A…E.
 
+⚠️ **Costura de unidades.** `ReadingEstimate.VelocityPerTick` es por **tick**; todas las
+velocidades de `SimulationConfig` son por **segundo**. De ahí el
+`config.TorpedoSpeed * config.TickDurationSeconds` en la implementación. Un factor de 60 que
+se cuele acá no rompe nada visiblemente: produce soluciones que compilan, pasan y apuntan mal.
+`AClosingTarget_IsShotWhereItWillBe` es el test que lo atrapa — si la conversión estuviera
+mal, elegiría otra banda.
+
 **Archivos:**
 - Crear: `tests/Sonar.Autopilot.Tests/FiringSolverTests.cs`
 - Crear: `src/Sonar.Autopilot/FiringSolver.cs`
@@ -785,6 +792,28 @@ public class AutopilotFireTests
     }
 
     [Fact]
+    public void AStaleReadingIsNotWorthShootingAt()
+    {
+        // Un contacto sale de `snapshot.Contacts` sólo al morir, nunca por irse del alcance,
+        // y el barrido no refresca nada más allá del radio 1.0. O sea que una lectura puede
+        // envejecer sin cota, y extrapolar linealmente desde ella produce una solución que
+        // el solucionador acepta con toda confianza: el error que mide es contra la posición
+        // PREDICHA, y una predicción rancia es internamente consistente y falsa.
+        var first = new[] { Contact(100, new Vec2(0, -0.90)) };
+        var second = new[] { Contact(100, new Vec2(0, -0.795)) };
+        var pilot = Tracking(first, second);
+
+        // Tres barridos de antigüedad: 1580 ticks contra un tope de 1260.
+        var stale = new[] { new ContactView(100, new Vec2(0, -0.795), 0, 'D', 1580) };
+        Assert.Null(pilot.Decide(TestSnapshot.Build(2000, stale)));
+
+        // Control positivo: la misma lectura, aún vigente, sí produce un disparo. En el tick
+        // 2000 el blanco ya cerró hasta 0.40, así que la banda correcta es la B y no la C.
+        var fresh = new[] { new ContactView(100, new Vec2(0, -0.795), 0, 'D', 100) };
+        Assert.Equal("B000", pilot.Decide(TestSnapshot.Build(2000, fresh)));
+    }
+
+    [Fact]
     public void ItDoesNotFireTwiceAtTheSameSolution()
     {
         // Con tres tubos y un vuelo de diez segundos, sin esta regla el piloto vacía el
@@ -841,14 +870,32 @@ public sealed class Autopilot
     /// </summary>
     private const double EngagedSeparationDegrees = 3.0;
 
+    /// <summary>
+    /// Barridos de antigüedad tras los cuales una lectura deja de servir para apuntar.
+    ///
+    /// Hace falta porque el solucionador no puede detectar el problema solo: mide el error
+    /// contra la posición PREDICHA, y una predicción hecha desde una lectura rancia es
+    /// internamente consistente y falsa. Un contacto sale de `snapshot.Contacts` sólo al
+    /// morir —nunca por salirse del alcance— y el barrido no refresca nada más allá del
+    /// radio 1.0, así que sin esta compuerta el piloto le dispara con confianza a un
+    /// fantasma de hace un minuto.
+    ///
+    /// Tres barridos: dos son el mínimo para tener velocidad, así que con menos se
+    /// rechazarían blancos recién adquiridos.
+    /// </summary>
+    private const double MaxReadingAgeSweeps = 3.0;
+
     private readonly SimulationConfig _config;
     private readonly BandLayout _layout;
     private readonly ContactTracker _tracker = new();
+    private readonly double _maxReadingAgeTicks;
 
     public Autopilot(SimulationConfig config)
     {
         _config = config;
         _layout = config.BuildBandLayout();
+        _maxReadingAgeTicks =
+            MaxReadingAgeSweeps * config.SweepPeriodSeconds / config.TickDurationSeconds;
     }
 
     /// <summary>
@@ -875,6 +922,7 @@ public sealed class Autopilot
         // por id ascendente, como pide el §3 del contrato.
         foreach (var contact in snapshot.Contacts)
         {
+            if (contact.AgeTicks > _maxReadingAgeTicks) continue;
             if (!_tracker.TryEstimate(contact.Id, out var estimate)) continue;
             if (!FiringSolver.TrySolve(_config, _layout, estimate, snapshot.Tick, out var solution)) continue;
             if (AlreadyEngaged(snapshot, solution)) continue;
@@ -911,7 +959,7 @@ public sealed class Autopilot
 dotnet test tests/Sonar.Autopilot.Tests/Sonar.Autopilot.Tests.csproj
 ```
 
-Esperado: 16 tests pasando.
+Esperado: 17 tests pasando.
 
 - [ ] **Paso 5: commit**
 
@@ -1040,7 +1088,7 @@ En `src/Sonar.Autopilot/Autopilot.cs`, cambia `Decide` y agrega el método:
 dotnet test Sonar.sln
 ```
 
-Esperado: 22 tests nuevos en total en el proyecto del piloto, suite completa en verde.
+Esperado: 23 tests en total en el proyecto del piloto, suite completa en verde.
 
 - [ ] **Paso 5: commit**
 
