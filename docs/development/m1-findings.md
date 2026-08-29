@@ -255,3 +255,30 @@ el RAM no tiene oposición posible.
 
 `[OPEN]` Qué se ajusta —el pañol, la defensa, o ninguno porque el limbo es información
 suficiente— es decisión de diseño y no la toma este plan.
+
+**Verificación por mutación.** Cinco mutaciones sobre una suite de 411 tests:
+
+| Mutación | Caídos | Qué demuestra |
+|---|---|---|
+| M1 · `Decide` devuelve siempre `null` | **24** | Cae `ThePilotActuallyPlays`: el control positivo sirve. Un bot que no teclea no pasa |
+| M2 · el índice devuelve siempre 99 | **12** | Cae `TheFirstWaveIsNotAWall` |
+| M3 · el índice devuelve siempre 0 | **6** | Cae `TheDemoSeedDiesUnderPressure`, y `TheFirstWaveIsNotAWall` aguanta |
+| M4 · extrapolación apagada | **8** | Cae la muerte bajo presión, pero **no** `ThePilotActuallyPlays` |
+| M5 · el piloto nunca despliega defensa | **4** | Sólo los unitarios de defensa: **ninguna afirmación de la pared se mueve** |
+
+Dos filas valen más que su número.
+
+**M2 y M3 se controlan entre sí.** Un medidor trabado en alto rompe una afirmación y un
+medidor trabado en cero rompe la otra. Si las dos cayeran con la misma mutación serían la
+misma afirmación escrita dos veces, que es la forma de test vacuo del §4 del contrato.
+
+**M4 no rompe `ThePilotActuallyPlays`, y eso corrige una suposición del plan.** El plan daba
+por hecho que sin adelantar el blanco el piloto no le pegaría a nada. Falso: apuntando a la
+lectura cruda igual llega a la oleada 2 y mata. A corta distancia el adelanto no decide el
+impacto — decide la eficiencia, y la eficiencia sólo se nota cuando el pañol es escaso.
+
+**M5 no mueve ninguna afirmación, y eso es exactamente lo que el plan avisó que había que
+mirar en el reporte y no en el test.** Quitarle la defensa al piloto convierte tres semillas
+que quedaban a la deriva en tres muertes. La suite no lo ve porque, a propósito, no afirma la
+muerte en esas tres. **El efecto de la defensa es invisible para los tests y evidente en el
+reporte** — que es la razón por la que este plan reporta números en vez de afirmarlos.
