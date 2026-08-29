@@ -42,6 +42,14 @@ public sealed class Pilot
     /// </summary>
     private const double MaxReadingAgeSweeps = 3.0;
 
+    /// <summary>
+    /// Ventana de despliegue. Con una sola defensa a la vez, gastarla contra un entrante
+    /// lejano deja al submarino sin red durante todo el tiempo que ese torpedo tarde en
+    /// llegar. Quince segundos es corto para no malgastarla y largo para que todavía quede
+    /// un centro de banda por delante del torpedo donde ponerla.
+    /// </summary>
+    private const double DeployWithinSeconds = 15.0;
+
     private readonly SimulationConfig _config;
     private readonly BandLayout _layout;
     private readonly ContactTracker _tracker = new();
@@ -62,8 +70,41 @@ public sealed class Pilot
     public void Observe(WorldSnapshot snapshot) => _tracker.Observe(snapshot);
 
     /// <summary>Comando del turno, o null si no hay nada que valga la pena teclear.</summary>
-public string? Decide(WorldSnapshot snapshot) =>
-        DecideFire(snapshot) ?? DecideReload(snapshot);
+    public string? Decide(WorldSnapshot snapshot) =>
+        DecideDefense(snapshot) ?? DecideFire(snapshot) ?? DecideReload(snapshot);
+
+    /// <summary>
+    /// Va antes que el disparo: un torpedo que llega en diez segundos vale más que un tiro
+    /// que tarda diez en llegar.
+    /// </summary>
+    private string? DecideDefense(WorldSnapshot snapshot)
+    {
+        if (snapshot.DefensesAvailable <= 0) return null;
+
+        // El más cercano es el que llega primero. Empate por id ascendente: la lista viene
+        // ordenada y la comparación es estricta.
+        var nearest = default(Vec2);
+        var nearestRadius = double.MaxValue;
+        foreach (var torpedo in snapshot.EnemyTorpedoes)
+        {
+            var radius = torpedo.Position.Length;
+            if (radius >= nearestRadius) continue;
+            nearestRadius = radius;
+            nearest = torpedo.Position;
+        }
+
+        if (nearestRadius == double.MaxValue) return null;
+
+        var secondsToImpact = nearestRadius / _config.EnemyTorpedoSpeed;
+        if (secondsToImpact > DeployWithinSeconds) return null;
+
+        if (!TryInterceptBand(nearestRadius, out var band)) return null;
+
+        var bearing = Bearing.FromVector(nearest);
+        if (LaneIsOccupiedByOwnTorpedo(snapshot, bearing, band)) return null;
+
+        return $"DEF {band.Letter}{bearing.Degrees:D3}";
+    }
 
     /// <summary>
     /// Oportunista: rellena cuando no hay nada mejor que hacer con el turno. RELOAD mueve un
@@ -118,6 +159,45 @@ public string? Decide(WorldSnapshot snapshot) =>
             if (Math.Abs(torpedo.RunToRadius - run) > 1e-9) continue;
             if (Bearing.Separation(torpedo.BearingDegrees, solution.Bearing.Degrees)
                 <= EngagedSeparationDegrees) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// La banda más externa cuyo centro el torpedo todavía no cruzó. Poner la defensa más
+    /// afuera sería ponerla detrás del torpedo, donde nunca va a pasar.
+    /// </summary>
+    private bool TryInterceptBand(double radius, out Band band)
+    {
+        band = default;
+        var found = false;
+        for (var i = 0; i < _layout.Count; i++)
+        {
+            var candidate = new Band(i);
+            if (_layout.CenterRadius(candidate) >= radius) break;
+            band = candidate;
+            found = true;
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// Una defensa mata los torpedos propios (§5 del contrato). Se compara el punto de la
+    /// defensa contra el punto donde el carril de cada torpedo propio cruza ese mismo radio.
+    /// El margen es el doble del radio de defensa: con menos, se roza.
+    /// </summary>
+    private bool LaneIsOccupiedByOwnTorpedo(WorldSnapshot snapshot, Bearing bearing, Band band)
+    {
+        var center = _layout.CenterRadius(band);
+        var defense = bearing.ToUnitVector() * center;
+
+        foreach (var torpedo in snapshot.Torpedoes)
+        {
+            // Si detona antes de ese radio nunca se cruzan.
+            if (torpedo.RunToRadius < center - _config.DefenseRadius) continue;
+
+            var lane = new Bearing(torpedo.BearingDegrees).ToUnitVector() * center;
+            if (Vec2.Distance(lane, defense) < _config.DefenseRadius * 2) return true;
         }
         return false;
     }
