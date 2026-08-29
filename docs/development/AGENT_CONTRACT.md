@@ -156,8 +156,10 @@ Del §70.6 del GDD. Úsala en specs, TDDs y planes:
 ## 7 · Límites de rol
 
 - **Instalaciones: da instrucciones, no instales.** El entorno lo maneja la persona.
-- **Git: solo local.** No agregar remotos ni empujar. La conexión al remoto la hace la
-  persona cuando corresponda.
+- **Git: local por defecto, empuje a pedido.** Commitear en local va sin preguntar.
+  **Empujar a `origin` sólo cuando la persona lo pide explícitamente**, nunca por iniciativa
+  propia — un commit local se deshace con un `reset`, uno empujado ya lo vio otra gente.
+  **Agregar o cambiar remotos, no**: eso lo hace la persona. `push --force`, nunca.
 - **El frontend y el diseño visual son de la persona.** Un agente aporta *instrucciones de
   cableado* — contratos de datos, orden de llamadas, forma del snapshot — no código de UI ni
   decisiones estéticas. Ver [godot-wiring.md](godot-wiring.md) como referencia de formato.
