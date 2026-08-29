@@ -56,6 +56,19 @@ public sealed class ContactTracker
 
             if (observedAt == tracked.LatestTick) continue;
 
+            // El reloj retrocedió: es una corrida nueva. RETRY reconstruye la Simulation
+            // —el tick vuelve a cero— y también el WaveDirector, así que los ids de contacto
+            // vuelven a empezar en 100. Sin olvidar acá, la entrada del contacto 100 del
+            // intento anterior recibiría esta lectura como si fuera la continuación de la
+            // suya, con un span negativo y una velocidad inventada.
+            if (observedAt < tracked.LatestTick)
+            {
+                tracked.Latest = contact.Position;
+                tracked.LatestTick = observedAt;
+                tracked.HasPrevious = false;
+                continue;
+            }
+
             tracked.Previous = tracked.Latest;
             tracked.PreviousTick = tracked.LatestTick;
             tracked.Latest = contact.Position;
@@ -74,6 +87,10 @@ public sealed class ContactTracker
             return false;
         }
 
+        // Estrictamente positivo por construcción: Observe descarta las lecturas repetidas
+        // por igualdad y reinicia el rastreo cuando el reloj retrocede, así que acá nunca
+        // llega un span cero o negativo. Lo sostiene ARetryStartsTheTrackingOver, no un
+        // chequeo defensivo que nadie podría ejercitar.
         var span = tracked.LatestTick - tracked.PreviousTick;
         var delta = tracked.Latest - tracked.Previous;
         estimate = new ReadingEstimate(tracked.Latest, delta * (1.0 / span), tracked.LatestTick);
@@ -90,15 +107,12 @@ public sealed class ContactTracker
         return null;
     }
 
-    /// <summary>Inserta manteniendo el orden por id ascendente, que es el orden de desempate.</summary>
-    private void Insert(Tracked tracked)
-    {
-        for (var i = 0; i < _tracked.Count; i++)
-        {
-            if (_tracked[i].Id <= tracked.Id) continue;
-            _tracked.Insert(i, tracked);
-            return;
-        }
-        _tracked.Add(tracked);
-    }
+    /// <summary>
+    /// Se agrega al final y no en orden de id, porque el orden de esta lista no lo lee nadie:
+    /// Find es su único consumidor y busca por id. La regla de determinismo del §3 del
+    /// contrato se cumple por no usar Dictionary ni HashSet, no por mantener un orden que
+    /// ningún recorrido observa. Si algún día algo la enumera, ahí habrá que ordenarla — y
+    /// testear ese orden, que es lo que faltaba cuando esto insertaba ordenado.
+    /// </summary>
+    private void Insert(Tracked tracked) => _tracked.Add(tracked);
 }
