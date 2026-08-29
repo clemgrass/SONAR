@@ -46,7 +46,7 @@ semilla mirando el reporte de la 10, y la 12 compara conteos contra la suite que
 |---|---|
 | `src/Sonar.Autopilot/ContactTracker.cs` | Recuerda las dos últimas lecturas por contacto y estima velocidad |
 | `src/Sonar.Autopilot/FiringSolver.cs` | Resuelve el encuentro: qué banda y qué marcación |
-| `src/Sonar.Autopilot/Autopilot.cs` | Decide el comando del turno: defensa, tiro o recarga |
+| `src/Sonar.Autopilot/Pilot.cs` | Decide el comando del turno: defensa, tiro o recarga |
 | `src/Sonar.Autopilot/SaturationMeter.cs` | Cuenta amenazas y comandos, calcula el índice |
 | `src/Sonar.Autopilot/AutopilotRun.cs` | El bucle por tick y el reporte de la corrida |
 | `src/Sonar.Autopilot/RunReport.cs` | La tabla que se imprime al terminar |
@@ -699,7 +699,7 @@ tick de observación, que es equivalente y exacto — ver el preámbulo de la ta
 
 **Archivos:**
 - Crear: `tests/Sonar.Autopilot.Tests/AutopilotFireTests.cs`
-- Crear: `src/Sonar.Autopilot/Autopilot.cs`
+- Crear: `src/Sonar.Autopilot/Pilot.cs`
 
 - [ ] **Paso 1: escribir los tests que fallan**
 
@@ -721,9 +721,9 @@ public class AutopilotFireTests
     /// Piloto que ya vio dos lecturas de cada contacto, que es el mínimo para tener
     /// velocidad. La segunda observación va en el tick 420 — una vuelta del haz a 7 s.
     /// </summary>
-    private static Autopilot Tracking(IReadOnlyList<ContactView> first, IReadOnlyList<ContactView> second)
+    private static Pilot Tracking(IReadOnlyList<ContactView> first, IReadOnlyList<ContactView> second)
     {
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         pilot.Observe(TestSnapshot.Build(0, first));
         pilot.Observe(TestSnapshot.Build(420, second));
         return pilot;
@@ -734,7 +734,7 @@ public class AutopilotFireTests
     {
         // Sin velocidad estimada no hay solución posible: disparar sería tirarle a donde
         // el blanco estaba. Un jugador está en la misma situación tras un solo barrido.
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         var snapshot = TestSnapshot.Build(0, new[] { Contact(100, new Vec2(0, -0.90)) });
         pilot.Observe(snapshot);
 
@@ -838,11 +838,11 @@ public class AutopilotFireTests
 dotnet test tests/Sonar.Autopilot.Tests/Sonar.Autopilot.Tests.csproj --filter AutopilotFireTests
 ```
 
-Esperado: no compila — `Autopilot` no existe.
+Esperado: no compila — `Pilot` no existe.
 
 - [ ] **Paso 3: implementar el piloto, por ahora sólo el disparo**
 
-`src/Sonar.Autopilot/Autopilot.cs`:
+`src/Sonar.Autopilot/Pilot.cs`:
 
 ```csharp
 using System;
@@ -856,12 +856,16 @@ namespace Sonar.Autopilot;
 /// El piloto. Decide un comando por turno leyendo <b>únicamente</b> el snapshot: lecturas
 /// envejecidas y con gating, lo mismo que ve el jugador.
 ///
+/// Se llama Pilot y no Autopilot porque `Autopilot` ya es un segmento del namespace
+/// `Sonar.Autopilot`: desde `Sonar.Autopilot.Tests` o desde `Sonar.Game`, el nombre a secas
+/// resuelve al namespace y no al tipo, y no compila (CS0118).
+///
 /// Que no reciba el GameController no es estilo: es el enforcement. Con él a mano alcanzaría
 /// LiveEnemyCount, que cuenta enemigos que el jugador quizá nunca leyó, y la pared que midiera
 /// este bot sería la de otro juego. Con esta firma, hacer trampa no compila — el mismo
 /// mecanismo por el que ContactView impide que la presentación dibuje la verdad.
 /// </summary>
-public sealed class Autopilot
+public sealed class Pilot
 {
     /// <summary>
     /// Separación por debajo de la cual dos disparos se consideran el mismo. Tres grados es
@@ -890,7 +894,7 @@ public sealed class Autopilot
     private readonly ContactTracker _tracker = new();
     private readonly double _maxReadingAgeTicks;
 
-    public Autopilot(SimulationConfig config)
+    public Pilot(SimulationConfig config)
     {
         _config = config;
         _layout = config.BuildBandLayout();
@@ -964,7 +968,7 @@ Esperado: 17 tests pasando.
 - [ ] **Paso 5: commit**
 
 ```bash
-git add src/Sonar.Autopilot/Autopilot.cs tests/Sonar.Autopilot.Tests/AutopilotFireTests.cs
+git add src/Sonar.Autopilot/Pilot.cs tests/Sonar.Autopilot.Tests/AutopilotFireTests.cs
 git commit -m "feat(autopilot): fire at the extrapolated target, one tube at a time"
 ```
 
@@ -982,7 +986,7 @@ en los tubos, se recarga. Es la jugada correcta y además hace aparecer el costo
 
 **Archivos:**
 - Crear: `tests/Sonar.Autopilot.Tests/AutopilotReloadTests.cs`
-- Modificar: `src/Sonar.Autopilot/Autopilot.cs`
+- Modificar: `src/Sonar.Autopilot/Pilot.cs`
 
 - [ ] **Paso 1: escribir los tests que fallan**
 
@@ -996,7 +1000,7 @@ namespace Sonar.Autopilot.Tests;
 
 public class AutopilotReloadTests
 {
-    private static Autopilot Idle() => new(TestConfig.Build());
+    private static Pilot Idle() => new(TestConfig.Build());
 
     [Fact]
     public void EmptyTubes_MeanReload()
@@ -1039,7 +1043,7 @@ public class AutopilotReloadTests
     {
         // La recarga es oportunista, no codiciosa: con un blanco resuelto y tubos a medias,
         // el turno es para el disparo.
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         var first = new[] { new ContactView(100, new Vec2(0, -0.90), 0, 'E', 0) };
         var second = new[] { new ContactView(100, new Vec2(0, -0.795), 0, 'D', 0) };
         pilot.Observe(TestSnapshot.Build(0, first));
@@ -1062,7 +1066,7 @@ primeros:** son el control positivo de los otros tres.
 
 - [ ] **Paso 3: agregar la recarga**
 
-En `src/Sonar.Autopilot/Autopilot.cs`, cambia `Decide` y agrega el método:
+En `src/Sonar.Autopilot/Pilot.cs`, cambia `Decide` y agrega el método:
 
 ```csharp
     public string? Decide(WorldSnapshot snapshot) =>
@@ -1093,7 +1097,7 @@ Esperado: 23 tests en total en el proyecto del piloto, suite completa en verde.
 - [ ] **Paso 5: commit**
 
 ```bash
-git add src/Sonar.Autopilot/Autopilot.cs tests/Sonar.Autopilot.Tests/AutopilotReloadTests.cs
+git add src/Sonar.Autopilot/Pilot.cs tests/Sonar.Autopilot.Tests/AutopilotReloadTests.cs
 git commit -m "feat(autopilot): top up the tubes when the turn has nothing better to do"
 ```
 
@@ -1114,7 +1118,7 @@ Dos reglas que no son obvias:
 
 **Archivos:**
 - Crear: `tests/Sonar.Autopilot.Tests/AutopilotDefenseTests.cs`
-- Modificar: `src/Sonar.Autopilot/Autopilot.cs`
+- Modificar: `src/Sonar.Autopilot/Pilot.cs`
 
 - [ ] **Paso 1: escribir los tests que fallan**
 
@@ -1140,14 +1144,14 @@ public class AutopilotDefenseTests
     public void AnInboundInsideTheWindow_GetsTheDefense()
     {
         // Banda B: es la más externa cuyo centro (0.37) el torpedo todavía no cruzó.
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         Assert.Equal("DEF B090", pilot.Decide(TestSnapshot.Build(0, enemyTorpedoes: Inbound)));
     }
 
     [Fact]
     public void AFarInbound_IsLeftAlone()
     {
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         Assert.Null(pilot.Decide(TestSnapshot.Build(0, enemyTorpedoes: FarInbound)));
 
         // Control positivo: el mismo torpedo, ya cerca, sí produce una defensa.
@@ -1157,7 +1161,7 @@ public class AutopilotDefenseTests
     [Fact]
     public void WithOneAlreadyInTheWater_ThereIsNothingToDeploy()
     {
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         Assert.Null(pilot.Decide(
             TestSnapshot.Build(0, enemyTorpedoes: Inbound, defensesAvailable: 0)));
     }
@@ -1167,7 +1171,7 @@ public class AutopilotDefenseTests
     {
         // Una defensa mata los torpedos propios. Cambiar un tiro propio por uno enemigo es
         // mal negocio cuando recargar cuesta un comando y tres segundos.
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         var ownLane = new[] { new TorpedoView(2, new Vec2(0.30, 0), 90, 0.55) };
 
         Assert.Null(pilot.Decide(
@@ -1183,7 +1187,7 @@ public class AutopilotDefenseTests
     public void DefendingComesBeforeShooting()
     {
         // Un blanco resuelto y un torpedo encima: el turno es para la defensa.
-        var pilot = new Autopilot(TestConfig.Build());
+        var pilot = new Pilot(TestConfig.Build());
         var first = new[] { new ContactView(100, new Vec2(0, -0.90), 0, 'E', 0) };
         var second = new[] { new ContactView(100, new Vec2(0, -0.795), 0, 'D', 0) };
         pilot.Observe(TestSnapshot.Build(0, first));
@@ -1208,7 +1212,7 @@ Esperado: fallan los que esperan `"DEF B090"`.
 
 - [ ] **Paso 3: agregar la defensa**
 
-En `src/Sonar.Autopilot/Autopilot.cs`, agrega la constante, cambia `Decide` y agrega los tres
+En `src/Sonar.Autopilot/Pilot.cs`, agrega la constante, cambia `Decide` y agrega los tres
 métodos:
 
 ```csharp
@@ -1311,7 +1315,7 @@ Esperado: suite completa en verde.
 - [ ] **Paso 5: commit**
 
 ```bash
-git add src/Sonar.Autopilot/Autopilot.cs tests/Sonar.Autopilot.Tests/AutopilotDefenseTests.cs
+git add src/Sonar.Autopilot/Pilot.cs tests/Sonar.Autopilot.Tests/AutopilotDefenseTests.cs
 git commit -m "feat(autopilot): intercept the nearest inbound, never in its own lane"
 ```
 
@@ -1697,13 +1701,13 @@ namespace Sonar.Autopilot;
 /// El piloto decide por número de tick, no por frame: un frame perdido en Godot hace la
 /// simulación más lenta, nunca distinta.
 /// </summary>
-public sealed class AutopilotRun
+public sealed class PilotRun
 {
     /// <summary>Tick y texto de cada comando. Godot lo engancha para escribirlo en el registro.</summary>
     public event Action<int, string>? CommandEmitted;
 
     private readonly GameController _controller;
-    private readonly Autopilot _pilot;
+    private readonly Pilot _pilot;
     private readonly SaturationMeter _meter;
     private readonly double _tickDuration;
     private readonly int _budgetTicks;
@@ -1713,7 +1717,7 @@ public sealed class AutopilotRun
     public AutopilotRun(SimulationConfig config, GameController controller, double paceSeconds)
     {
         _controller = controller;
-        _pilot = new Autopilot(config);
+        _pilot = new Pilot(config);
         _meter = new SaturationMeter(config);
         _tickDuration = config.TickDurationSeconds;
         _budgetTicks = (int)Math.Round(paceSeconds / config.TickDurationSeconds);
@@ -2348,11 +2352,11 @@ Para cada fila: aplica la mutación, corre la suite, **anota cuántos tests fall
 
 - [ ] **Paso 1: el piloto no teclea nada**
 
-En `Autopilot.Decide`, reemplaza el cuerpo por `return null;`.
+En `Pilot.Decide`, reemplaza el cuerpo por `return null;`.
 
 ```bash
 dotnet test Sonar.sln 2>&1 | tail -5
-git checkout src/Sonar.Autopilot/Autopilot.cs
+git checkout src/Sonar.Autopilot/Pilot.cs
 ```
 
 Debe caer: `ThePilotActuallyPlays` (las cinco), `TheBudgetPacesTheCommands`,
@@ -2403,11 +2407,11 @@ afirmaciones se controlan mutuamente y no son la misma cosa dicha dos veces.
 
 - [ ] **Paso 5: la defensa desconectada — esta no es una mutación, es una medición**
 
-En `Autopilot.Decide`, quita `DecideDefense(snapshot) ??`.
+En `Pilot.Decide`, quita `DecideDefense(snapshot) ??`.
 
 ```bash
 dotnet test tests/Sonar.Autopilot.Tests/Sonar.Autopilot.Tests.csproj --filter ThePilotActuallyPlays -v n
-git checkout src/Sonar.Autopilot/Autopilot.cs
+git checkout src/Sonar.Autopilot/Pilot.cs
 ```
 
 Caerán los unitarios de defensa, obviamente. Lo que interesa es **el reporte**: compara las
