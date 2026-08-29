@@ -62,7 +62,21 @@ public sealed class Pilot
     public void Observe(WorldSnapshot snapshot) => _tracker.Observe(snapshot);
 
     /// <summary>Comando del turno, o null si no hay nada que valga la pena teclear.</summary>
-    public string? Decide(WorldSnapshot snapshot) => DecideFire(snapshot);
+public string? Decide(WorldSnapshot snapshot) =>
+        DecideFire(snapshot) ?? DecideReload(snapshot);
+
+    /// <summary>
+    /// Oportunista: rellena cuando no hay nada mejor que hacer con el turno. RELOAD mueve un
+    /// solo proyectil, así que llenar el cargador son tres comandos — y esos tres comandos
+    /// compitiendo con los disparos es exactamente lo que la pregunta 7 de M1 quiere medir.
+    /// </summary>
+    private string? DecideReload(WorldSnapshot snapshot)
+    {
+        if (snapshot.ReloadInProgress) return null;
+        if (snapshot.AmmoReserve <= 0) return null;
+        if (snapshot.AmmoLoaded >= _config.MagazineSize) return null;
+        return "RELOAD";
+    }
 
     private string? DecideFire(WorldSnapshot snapshot)
     {
