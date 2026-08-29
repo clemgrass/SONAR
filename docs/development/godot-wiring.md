@@ -490,3 +490,34 @@ que ese número se pueda retocar sin tocar código.
 y entraron `heldFire`, `ramClosing` y `torpedoCollision`. Con cinco personalidades y unos
 veinte testers, sin la columna de personalidad los datos son el promedio de cinco cosas
 distintas.
+
+---
+
+## Modo demo
+
+`make demo` corre la escena con el piloto automático al mando:
+
+    godot-mono --path src/Sonar.Game -- --demo --seed=20260811 --pace=1.5 --speed=1
+
+| Bandera | Qué hace | Default |
+|---|---|---|
+| `--demo` | Enciende el piloto. Sin ella el juego es idéntico | apagado |
+| `--seed=N` | Semilla de la corrida | `20260811` |
+| `--pace=X` | Segundos por comando del bot | `1.5` |
+| `--speed=K` | Multiplicador de reproducción | `1` |
+
+Excluyente con `--m1-selftest`: uno teclea por el piloto y el otro inyecta teclas para
+comprobar que el terminal las recibe.
+
+**Lo que la presentación puede dibujar y hoy no dibuja.** `Main` tiene accesibles tres datos
+del piloto; ninguno se pinta, porque el diseño visual es de la persona (§7 del contrato):
+
+| Dato | Tipo | Qué mostraría |
+|---|---|---|
+| `_demo.Saturation` | `double`, cada tick | El índice cruzando 1 antes de la muerte |
+| `_demo.LastCommand` | `string?` | Lo que el bot "teclea", en el campo de comandos |
+| `_demo.BuildReport()` | tabla por oleada | Un panel de cierre al morir |
+
+**Determinismo.** El piloto decide por número de tick, no por frame: un frame perdido hace la
+simulación más lenta, nunca distinta. Por eso lo que se mira acá es exactamente la corrida que
+afirma `TheWallTests`.

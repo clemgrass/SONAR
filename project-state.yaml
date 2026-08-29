@@ -25,8 +25,8 @@ toolchain:
     - "dotnet new classlib/xunit generan net10.0 por defecto; hay que corregir a net9.0 a mano"
 
 architecture:
-  chain: Sonar.Game (Godot) -> Sonar.Controller -> Sonar.Core
-  rule: ni Core ni Controller referencian Godot; esa ausencia es el enforcement
+  chain: Sonar.Game (Godot) -> Sonar.Autopilot -> Sonar.Controller -> Sonar.Core
+  rule: ni Core ni Controller ni Autopilot referencian Godot; esa ausencia es el enforcement
 
 progress:
   plan_1_foundation: done          # 10/10 tareas, 78 tests
@@ -40,6 +40,10 @@ progress:
   plan_6_watch_and_telemetry: done   # 10/10 tareas
   plan_7_enemy_mind: done            # 11/11 + una tarea 12 que salió al cerrar; 336 tests
   plan_8_held_fire_and_telemetry: done  # 8/8; 352 tests. Falta sólo conectar el remoto
+  plan_9_autopilot_and_the_wall: done   # 14/14; 411 tests
+    # Primera vez que se ven las oleadas 2, 3 y 4. El hallazgo no fue la pared de ritmo que
+    # se buscaba: las cinco semillas gastan el pañol completo —quince torpedos— y tres de
+    # ellas quedan a la deriva sin poder matar ni morir. Ver m1-findings.md.
 
 systems:
   spatial_primitives: done         # Vec2, Bearing, Band, BandLayout, TargetCoordinate
@@ -54,6 +58,8 @@ systems:
   sonar_gating: done               # cruce de barrido + lecturas con gating
   controller: done                 # parser, snapshot, acumulador con tope
   godot_presentation: prototype    # guardia legible y medida; el diseño visual va tras M1
+  autopilot: done                  # piloto que juega leyendo sólo el snapshot, e índice de saturación
+  demo_mode: done                  # `make demo`: el bot juega en el scope real, mismos números que el test
 
 open_decisions:
   - band_count                     # 5 u 8 -> M1 pregunta 5
