@@ -6,7 +6,7 @@ A command-line arcade game: you run a submarine's sonar, you see contacts on a s
 
 ![Wave 3: four torpedoes head for old marks while the log shows the typed commands](docs/media/oleada-3.gif)
 
-> **Paused prototype** · v0.1.0 · Windows and Linux · English interface · Play it on itch: [cgrassdev.itch.io/sonar](https://cgrassdev.itch.io/sonar)
+> **Paused prototype** · v0.1.1 · Windows and Linux · English interface · Play it on itch: [cgrassdev.itch.io/sonar](https://cgrassdev.itch.io/sonar)
 
 ## How to play
 
@@ -45,7 +45,7 @@ The project is **paused**. The balance is not tuned and the M1 questions (`docs/
 - **Four layers, one direction:** `Sonar.Game` (Godot) → `Sonar.Autopilot` → `Sonar.Controller` → `Sonar.Core`. Neither the simulation (`Core`) nor the `Controller` references Godot, so they are tested without opening the editor. Godot only draws and takes what you type.
 - **Deterministic simulation.** It runs in fixed 1/60 s ticks, with seeded randomness and a fixed update order: the same seed and the same commands give exactly the same run. That makes `RETRY` a clean reset and any run replayable.
 - **The screen never knows the truth.** The view only receives the reading from the last sweep, and a test fails if anyone exposes the real position.
-- **Enemies with personality.** There are five kinds, defined as data. One circles far away and fires patiently, one closes in, fires and backs off, one fires often and badly to make you spend defences, one arrives late and aims better than the rest, and the last one never fires: it rams you, and you can hear it coming.
+- **Enemies with personality.** There are five kinds, defined as data. One circles far away and fires patiently, one closes in, fires and backs off, one fires often and badly to make you spend defences, one arrives late and aims better than the rest, and the last one never fires: it rams you, and the log warns you as it closes in.
 - **An autopilot that plays from the screen alone.** `Sonar.Autopilot` remembers readings, estimates velocities and fires where the contact is going to be. It was used to measure where the game becomes impossible, and `make demo` shows it playing on the real scope.
 - **Tests checked by breaking the code.** The important properties are verified by breaking the implementation on purpose and confirming that the tests fail.
 
@@ -72,7 +72,7 @@ make export           # Linux and Windows builds in build/
 
 The game's values (speeds, radii, reload) are in `config/simulation.working.json`. In development they are read from there directly, so you can change them and play again without rebuilding.
 
-The v0.1.0 builds are in [Releases](https://github.com/clemgrass/SONAR/releases). The design, decisions and plans for each stage are in `docs/`.
+The v0.1.1 builds are in [Releases](https://github.com/clemgrass/SONAR/releases). The design, decisions and plans for each stage are in `docs/`.
 
 ## Credits and license
 

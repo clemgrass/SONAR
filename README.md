@@ -6,7 +6,7 @@ Un arcade de comandos: eres el operador del sonar de un submarino, ves los conta
 
 ![Oleada 3: cuatro torpedos propios salen hacia marcas viejas mientras el registro muestra los comandos escritos](docs/media/oleada-3.gif)
 
-> **Prototipo en pausa** · v0.1.0 · Windows y Linux · Interfaz en inglés · Juégalo en itch: [cgrassdev.itch.io/sonar](https://cgrassdev.itch.io/sonar)
+> **Prototipo en pausa** · v0.1.1 · Windows y Linux · Interfaz en inglés · Juégalo en itch: [cgrassdev.itch.io/sonar](https://cgrassdev.itch.io/sonar)
 
 ## Cómo se juega
 
@@ -45,7 +45,7 @@ El proyecto quedó **en pausa**. El balance no está ajustado y las preguntas de
 - **Cuatro capas en una sola dirección:** `Sonar.Game` (Godot) → `Sonar.Autopilot` → `Sonar.Controller` → `Sonar.Core`. Ni la simulación (`Core`) ni el `Controller` referencian Godot, así que se prueban sin abrir el editor. Godot solo dibuja y recibe lo que escribes.
 - **Simulación determinista.** Avanza en ticks fijos de 1/60 s, con el azar sembrado y un orden de actualización fijo: la misma semilla y los mismos comandos dan exactamente la misma partida. Así `RETRY` es un reinicio limpio y cualquier partida se puede repetir.
 - **La pantalla nunca sabe la verdad.** La vista solo recibe la lectura del último barrido, y hay un test que falla si alguien expone la posición real.
-- **Enemigos con personalidad.** Hay cinco tipos, definidos como datos. Uno orbita lejos y dispara con paciencia, otro se acerca, dispara y se aleja, otro dispara seguido y mal para hacerte gastar defensas, otro llega tarde y apunta mejor que el resto, y el último no dispara: se te tira encima, y se le oye venir.
+- **Enemigos con personalidad.** Hay cinco tipos, definidos como datos. Uno orbita lejos y dispara con paciencia, otro se acerca, dispara y se aleja, otro dispara seguido y mal para hacerte gastar defensas, otro llega tarde y apunta mejor que el resto, y el último no dispara: se te tira encima, y el registro avisa cuando se acerca.
 - **Un piloto automático que juega leyendo solo la pantalla.** `Sonar.Autopilot` recuerda las lecturas, estima velocidades y dispara a donde va a estar el contacto. Sirvió para medir dónde el juego se vuelve imposible, y `make demo` lo muestra jugando en el radar real.
 - **Tests que se comprueban rompiendo el código.** Las propiedades importantes se verifican rompiendo la implementación a propósito y confirmando que los tests fallan.
 
@@ -72,7 +72,7 @@ make export           # builds de Linux y Windows en build/
 
 Los valores del juego (velocidades, radios, recarga) están en `config/simulation.working.json`. En desarrollo se leen de ahí directamente, así que puedes cambiarlos y volver a jugar sin recompilar.
 
-Los builds de la v0.1.0 están en [Releases](https://github.com/clemgrass/SONAR/releases). El diseño, las decisiones y los planes de cada etapa están en `docs/`.
+Los builds de la v0.1.1 están en [Releases](https://github.com/clemgrass/SONAR/releases). El diseño, las decisiones y los planes de cada etapa están en `docs/`.
 
 ## Créditos y licencia
 
