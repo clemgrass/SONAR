@@ -1,0 +1,10 @@
+<Project>
+  <!-- Builds exportados (Godot compila los cuatro proyectos en ExportRelease): sin .pdb y sin rutas
+       absolutas de la máquina que exporta dentro de los ensamblados. Los tests y el editor no cambian. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/</PathMap>
+  </PropertyGroup>
+</Project>

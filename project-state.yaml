@@ -6,7 +6,7 @@
 
 project:
   name: sonar
-  status: paused                   # en pausa desde 2026-11-25; v0.1.0 publicada como prototipo
+  status: paused                   # en pausa desde 2026-11-25; v0.1.1 publicada como prototipo
 
 milestone:
   current: M1
@@ -74,6 +74,7 @@ open_decisions:
 
 release:
   v0_1_0: "build del prototipo M1 para Windows y Linux (`make export`); la config va embebida"
+  v0_1_1: "el mismo build, sin .pdb ni rutas locales en los ensamblados (Directory.Build.props)"
 
 documents:
   gdd: GAME DESIGN DOCUMENT.md
