@@ -6,7 +6,7 @@
 
 project:
   name: sonar
-  status: pre_production
+  status: paused                   # en pausa desde 2026-11-25; v0.1.0 publicada como prototipo
 
 milestone:
   current: M1
@@ -23,6 +23,7 @@ toolchain:
   notes:
     - "dotnet new sln requiere --format sln: el SDK 10 genera .slnx por defecto y el fallo es silencioso"
     - "dotnet new classlib/xunit generan net10.0 por defecto; hay que corregir a net9.0 a mano"
+    - "el export de Godot exige src/Sonar.Game/Sonar.Game.sln, aparte de Sonar.sln (que sigue sin el juego)"
 
 architecture:
   chain: Sonar.Game (Godot) -> Sonar.Autopilot -> Sonar.Controller -> Sonar.Core
@@ -70,6 +71,9 @@ open_decisions:
   - repeat_and_fine_adjust_commands # M1 pregunta 6
   - salvo_command                  # M1 pregunta 7
   - cross_platform_bit_determinism # solo si se quieren replays compartibles
+
+release:
+  v0_1_0: "build del prototipo M1 para Windows y Linux (`make export`); la config va embebida"
 
 documents:
   gdd: GAME DESIGN DOCUMENT.md
