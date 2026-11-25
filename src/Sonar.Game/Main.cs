@@ -133,8 +133,25 @@ public partial class Main : Node
     /// para poder ajustar valores y volver a jugar sin tocar el juego — que es el ciclo
     /// entero de M1. Se lee por ruta absoluta porque res:// no sale del proyecto.
     /// </summary>
+    private const string ExportedConfigPath = "res://simulation.json";
+
     private static SimulationConfig LoadConfig()
     {
+        // En un build exportado config/ de la raíz no existe: `make export` copia la config
+        // dentro del proyecto y el preset la empaqueta en el .pck. Embebida y no al lado del
+        // ejecutable, para que quien descarga el prototipo no pueda dejarlo sin abrir.
+        if (OS.HasFeature("template"))
+        {
+            if (!Godot.FileAccess.FileExists(ExportedConfigPath))
+            {
+                GD.PushError($"El build no trae la configuración en {ExportedConfigPath}");
+                throw new FileNotFoundException("Falta la config embebida", ExportedConfigPath);
+            }
+
+            return SimulationConfigLoader.LoadFromJson(
+                Godot.FileAccess.GetFileAsString(ExportedConfigPath));
+        }
+
         var path = Path.GetFullPath(Path.Combine(
             ProjectSettings.GlobalizePath("res://"), "..", "..", "config", "simulation.working.json"));
 

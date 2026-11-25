@@ -8,8 +8,11 @@ obj/
 .godot/
 .import/
 export.cfg
-export_presets.cfg
 *.translation
+
+# Builds: `make export` los deja en build/ y copia la config dentro del proyecto
+build/
+src/Sonar.Game/simulation.json
 
 # Herramientas de brainstorming
 .superpowers/
